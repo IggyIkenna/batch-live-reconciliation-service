@@ -18,6 +18,23 @@ dependencies = [
 [project.scripts]
 batch-live-reconciliation-service = "batch_live_reconciliation_service.cli.main:main"
 
+
+[tool.uv.sources.unified-config-interface]
+path = "../unified-config-interface"
+editable = true
+
+[tool.uv.sources.unified-cloud-interface]
+path = "../unified-cloud-interface"
+editable = true
+
+[tool.uv.sources.unified-events-interface]
+path = "../unified-events-interface"
+editable = true
+
+[tool.uv.sources.unified-trading-library]
+path = "../unified-trading-library"
+editable = true
+
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
@@ -34,3 +51,9 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]
