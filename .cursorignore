@@ -1,0 +1,17 @@
+# Python repo .cursorignore template
+# Reference: instruments-service, unified-trading-library
+
+**/.venv/**
+**/venv/**
+**/.venv-workspace/**
+**/node_modules/**
+**/dist/**
+**/build/**
+**/__pycache__/**
+**/.mypy_cache/**
+**/.hypothesis/**
+**/.ruff_cache/**
+**/.pytest_cache/**
+**/.cache/**
+**/data/**
+**/logs/**

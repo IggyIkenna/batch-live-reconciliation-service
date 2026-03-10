@@ -50,6 +50,8 @@ jobs:
 
             # Clone unified-config-interface to ../ (matches pyproject.toml dependency)
             (git clone -b "$BRANCH" "https://x-access-token:${GH_PAT}@github.com/IggyIkenna/unified-config-interface.git" ../unified-config-interface 2>/dev/null || git clone -b main "https://x-access-token:${GH_PAT}@github.com/IggyIkenna/unified-config-interface.git" ../unified-config-interface 2>/dev/null) || true
+            (git clone -b "$BRANCH" "https://x-access-token:${GH_PAT}@github.com/IggyIkenna/unified-trading-pm.git" ../unified-trading-pm 2>/dev/null \
+              || git clone -b main "https://x-access-token:${GH_PAT}@github.com/IggyIkenna/unified-trading-pm.git" ../unified-trading-pm 2>/dev/null) || true
             echo "✅ Cloned unified-config-interface"
           else
             echo "❌ GH_PAT not set" && exit 1
