@@ -1,0 +1,87 @@
+"""
+Pydantic models for reconciliation reports.
+
+No Any types per workspace standards.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+
+from pydantic import BaseModel, Field
+
+
+class ReconStage(str, Enum):
+    """T+1 reconciliation pipeline stages."""
+
+    CONFIG_PULL = "config_pull"
+    ML_RECON = "ml_recon"
+    STRATEGY_RECON = "strategy_recon"
+    EXECUTION_RECON = "execution_recon"
+    AGENT_ANALYSIS = "agent_analysis"
+    RESULTS_WRITER = "results_writer"
+
+
+class ReconStatus(str, Enum):
+    """Status of a reconciliation run or stage."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class DeviationRecord(BaseModel):
+    """A single metric deviation above threshold."""
+
+    metric_name: str
+    stage: ReconStage
+    actual_value: float
+    threshold: float
+    direction: str  # "above" | "below"
+    description: str
+    instrument_id: str | None = None
+
+
+class StageReport(BaseModel):
+    """Results for a single reconciliation stage."""
+
+    stage: ReconStage
+    status: ReconStatus
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    deviations: list[DeviationRecord] = Field(default_factory=list)
+    metrics: dict[str, float] = Field(default_factory=dict)
+    error_message: str | None = None
+    output_gcs_path: str | None = None
+
+    @property
+    def deviation_count(self) -> int:
+        return len(self.deviations)
+
+    @property
+    def passed(self) -> bool:
+        return self.status == ReconStatus.PASSED
+
+
+class ReconReport(BaseModel):
+    """Full T+1 reconciliation run report."""
+
+    date: str  # YYYY-MM-DD
+    run_id: str
+    started_at: datetime
+    completed_at: datetime | None = None
+    status: ReconStatus = ReconStatus.PENDING
+    stages: list[StageReport] = Field(default_factory=list)
+    agent_report_gcs_path: str | None = None
+    summary_gcs_path: str | None = None
+
+    @property
+    def total_deviations(self) -> int:
+        return sum(s.deviation_count for s in self.stages)
+
+    @property
+    def failed_stages(self) -> list[ReconStage]:
+        return [s.stage for s in self.stages if s.status == ReconStatus.FAILED]
