@@ -80,7 +80,7 @@ jobs:
         env:
           CLOUD_MOCK_MODE: "true"
           GCP_PROJECT_ID: "test-project"
-        run: bash scripts/quality-gates.sh
+        run: bash scripts/quality-gates.sh --no-fix
 
       - name: Quality gates passed
         run: |
