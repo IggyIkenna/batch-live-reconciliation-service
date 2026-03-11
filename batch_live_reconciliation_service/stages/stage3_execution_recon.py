@@ -69,7 +69,8 @@ def _compute_metrics(
             "live_fill_count": 0.0,
         }
 
-    fills = lambda evs: [e for e in evs if e.get("event_type") == "FILL"]  # noqa: E731
+    def fills(evs: list[dict[str, object]]) -> list[dict[str, object]]:
+        return [e for e in evs if e.get("event_type") == "FILL"]
 
     live_fills = fills(live_events)
     batch_fills = fills(batch_events)

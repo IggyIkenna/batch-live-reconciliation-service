@@ -10,8 +10,6 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from batch_live_reconciliation_service.models.recon_report import (
     ReconReport,
     ReconStage,
@@ -22,7 +20,6 @@ from batch_live_reconciliation_service.stages.stage5_results_writer import (
     _load_index,
     run_stage5,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

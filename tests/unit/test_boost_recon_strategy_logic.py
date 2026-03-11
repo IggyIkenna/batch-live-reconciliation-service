@@ -15,7 +15,6 @@ from batch_live_reconciliation_service.stages.stage2_strategy_recon import (
     _compute_metrics,
 )
 
-
 # ---------------------------------------------------------------------------
 # _compute_metrics
 # ---------------------------------------------------------------------------

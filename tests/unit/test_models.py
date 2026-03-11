@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import pytest
-
 from batch_live_reconciliation_service.models.recon_report import (
     DeviationRecord,
     ReconReport,

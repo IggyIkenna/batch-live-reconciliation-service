@@ -15,7 +15,6 @@ from batch_live_reconciliation_service.stages.stage3_execution_recon import (
     _compute_metrics,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

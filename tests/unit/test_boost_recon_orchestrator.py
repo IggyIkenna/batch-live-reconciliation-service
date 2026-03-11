@@ -9,8 +9,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from batch_live_reconciliation_service.models.recon_report import (
     ReconReport,
     ReconStage,
@@ -18,7 +16,6 @@ from batch_live_reconciliation_service.models.recon_report import (
     StageReport,
 )
 from batch_live_reconciliation_service.orchestrator import run_reconciliation
-
 
 # ---------------------------------------------------------------------------
 # Helpers

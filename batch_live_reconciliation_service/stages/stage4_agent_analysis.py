@@ -8,10 +8,8 @@ emits a PubSub alert to alerting-service → Slack #trading-recon.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import UTC, datetime
-from typing import cast
 
 from unified_cloud_interface import get_storage_client
 from unified_events_interface import log_event
