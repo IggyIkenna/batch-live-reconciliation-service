@@ -72,8 +72,8 @@ def _compute_metrics(
 
     # Index events by instrument_id + timeframe for comparison
     def _key(ev: dict[str, object]) -> str:
-        inst = str(ev.get("instrument_id", ""))
-        tf = str(ev.get("timeframe", ""))
+        inst = str(ev.get("instrument_id") or "_missing")
+        tf = str(ev.get("timeframe") or "_missing")
         return f"{inst}:{tf}"
 
     batch_idx: dict[str, dict[str, object]] = {_key(e): e for e in batch_events}

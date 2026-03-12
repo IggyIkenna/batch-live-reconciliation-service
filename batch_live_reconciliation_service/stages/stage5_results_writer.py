@@ -83,13 +83,13 @@ def run_stage5(
         }
 
         summary_blob = f"t1-recon/recon/summary_{date}.json"
-        summary_uri = f"gs://{config.recon_bucket}/{summary_blob}"
+        summary_uri = f"gs://{config.recon_bucket}/{summary_blob}"  # noqa: gs-uri
 
         if not dry_run:
             client = get_storage_client()
 
             # Write summary
-            client.upload_bytes(
+            _ = client.upload_bytes(
                 bucket=config.recon_bucket,
                 blob_path=summary_blob,
                 data=json.dumps(summary, indent=2, default=str).encode("utf-8"),
@@ -108,9 +108,9 @@ def run_stage5(
             # Remove existing entry for this date if present
             index = [e for e in index if e.get("date") != date]
             index.append(index_entry)
-            index.sort(key=lambda e: str(e.get("date", "")), reverse=True)
+            index.sort(key=lambda e: str(e.get("date") or ""), reverse=True)
 
-            client.upload_bytes(
+            _ = client.upload_bytes(
                 bucket=config.recon_bucket,
                 blob_path="t1-recon/recon/index.json",
                 data=json.dumps(index, indent=2, default=str).encode("utf-8"),

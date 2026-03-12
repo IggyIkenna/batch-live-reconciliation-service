@@ -178,9 +178,7 @@ def test_run_reconciliation_aborts_on_stage0_failure() -> None:
         ),
         patch("batch_live_reconciliation_service.orchestrator._setup_observability"),
         patch("batch_live_reconciliation_service.orchestrator.log_event"),
-        patch(
-            "batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0
-        ) as mock_s0,
+        patch("batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0),
         patch("batch_live_reconciliation_service.orchestrator.run_stage1") as mock_s1,
     ):
         report = run_reconciliation("2026-03-11")

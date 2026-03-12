@@ -72,8 +72,8 @@ def _compute_metrics(
 
     # Index instruction events by instrument_id + side
     def _key(ev: dict[str, object]) -> str:
-        inst = str(ev.get("instrument_id", ""))
-        side = str(ev.get("side", ""))
+        inst = str(ev.get("instrument_id") or "_missing")
+        side = str(ev.get("side") or "_missing")
         return f"{inst}:{side}"
 
     batch_instructions = {_key(e): e for e in batch_events if e.get("event_type") == "INSTRUCTION"}
@@ -98,12 +98,12 @@ def _compute_metrics(
 
     # Max position deviation
     batch_positions: dict[str, float] = {
-        str(e.get("instrument_id", "")): float(cast(float, e.get("net_position", 0.0)))
+        str(e.get("instrument_id") or "_missing"): float(cast(float, e.get("net_position", 0.0)))
         for e in batch_events
         if e.get("event_type") == "POSITION_SNAPSHOT"
     }
     live_positions: dict[str, float] = {
-        str(e.get("instrument_id", "")): float(cast(float, e.get("net_position", 0.0)))
+        str(e.get("instrument_id") or "_missing"): float(cast(float, e.get("net_position", 0.0)))
         for e in live_events
         if e.get("event_type") == "POSITION_SNAPSHOT"
     }

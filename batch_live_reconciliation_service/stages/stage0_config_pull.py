@@ -42,7 +42,7 @@ def _blob_exists(bucket: str, blob_path: str) -> bool:
     try:
         bucket_obj = client.bucket(bucket)
         blob = bucket_obj.blob(blob_path)
-        return cast(bool, blob.exists())
+        return bool(blob.exists())
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as e:
         logger.warning("Error checking GCS path gs://%s/%s: %s", bucket, blob_path, e)
         return False
@@ -124,7 +124,7 @@ def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
 
     # Load config snapshot for downstream stages
     try:
-        _load_config_snapshot(config.execution_store_bucket, date)
+        _ = _load_config_snapshot(config.execution_store_bucket, date)
     except FileNotFoundError as e:
         log_event(
             "PROCESSING_COMPLETED", details={"stage": "stage0_config_pull", "status": "FAILED"}

@@ -194,7 +194,7 @@ def test_check_deviations_all_breached() -> None:
 def test_check_deviations_boundary_exact_threshold_no_breach() -> None:
     # Exactly at threshold — should NOT fire (< or > not <=/>= for direction)
     metrics = {
-        "signal_direction_match_rate": ML_THRESHOLDS.signal_direction_match_rate_min,  # exactly 0.95
+        "signal_direction_match_rate": ML_THRESHOLDS.signal_direction_match_rate_min,
         "signal_magnitude_mae": ML_THRESHOLDS.signal_magnitude_mae_max,  # exactly 0.1
         "instrument_coverage_pct": ML_THRESHOLDS.instrument_coverage_pct_min,  # exactly 0.90
         "latency_delta_ms": ML_THRESHOLDS.latency_delta_ms_max,  # exactly 5000.0

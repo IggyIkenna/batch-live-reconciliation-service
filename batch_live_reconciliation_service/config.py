@@ -7,6 +7,7 @@ Uses UnifiedCloudConfig (no os.getenv() per workspace standards).
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import override
 
 from unified_config_interface import UnifiedCloudConfig
 
@@ -29,6 +30,7 @@ class ReconConfig(UnifiedCloudConfig):
     # Whether to skip writing to GCS (dry-run mode)
     dry_run: bool = False
 
+    @override
     def model_post_init(self, __context: object) -> None:
         """Derive bucket names from project_id if not set."""
         project_id = self.gcp_project_id or ""

@@ -112,10 +112,13 @@ def test_load_config_snapshot_raises_file_not_found_on_error() -> None:
     mock_client = MagicMock()
     mock_client.download_bytes.side_effect = RuntimeError("blob not found")
 
-    with patch(
-        "batch_live_reconciliation_service.stages.stage0_config_pull.get_storage_client",
-        return_value=mock_client,
-    ), pytest.raises(FileNotFoundError, match="Config snapshot not found"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage0_config_pull.get_storage_client",
+            return_value=mock_client,
+        ),
+        pytest.raises(FileNotFoundError, match="Config snapshot not found"),
+    ):
         _load_config_snapshot("exec-store-bucket", "2026-03-11")
 
 

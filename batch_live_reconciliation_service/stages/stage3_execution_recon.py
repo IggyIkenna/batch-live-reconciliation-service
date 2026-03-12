@@ -103,9 +103,7 @@ def _compute_metrics(
 
     # Algo selection accuracy
     algo_events = [e for e in live_events if e.get("event_type") == "ORDER_SUBMITTED"]
-    algo_correct = sum(
-        1 for e in algo_events if str(e.get("algo_used", "")) == str(e.get("algo_configured", ""))
-    )
+    algo_correct = sum(1 for e in algo_events if e.get("algo_used") == e.get("algo_configured"))
     algo_accuracy = algo_correct / max(len(algo_events), 1)
 
     # P99 latency from live orders

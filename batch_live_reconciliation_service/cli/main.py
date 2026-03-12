@@ -27,19 +27,19 @@ def _build_parser() -> argparse.ArgumentParser:
             "T+1 Batch-Live Reconciliation — nightly pipeline replay and deviation analysis"
         ),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--date",
         type=str,
         default=None,
         help="Date to reconcile (YYYY-MM-DD). Defaults to yesterday.",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--dry-run",
         action="store_true",
         default=False,
         help="Run pipeline without writing to GCS (read-only validation).",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
 
     log_level: str = cast(str, args.log_level)
     logging.basicConfig(
-        level=getattr(logging, log_level),
+        level=cast(int, getattr(logging, log_level)),
         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
     )
 
@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     dry_run: bool = cast(bool, args.dry_run)
 
     if date_arg:
-        datetime.strptime(date_arg, "%Y-%m-%d")  # validate format
+        _ = datetime.strptime(date_arg, "%Y-%m-%d")  # validate format
         date = date_arg
     else:
         date = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()

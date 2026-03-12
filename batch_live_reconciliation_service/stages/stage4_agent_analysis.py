@@ -69,14 +69,14 @@ def _write_agent_report(
 ) -> str:
     """Write agent report markdown to GCS. Returns GCS URI."""
     blob_path = f"t1-recon/recon/agent_report_{date}.md"
-    gcs_uri = f"gs://{bucket}/{blob_path}"
+    gcs_uri = f"gs://{bucket}/{blob_path}"  # noqa: gs-uri
 
     if dry_run:
         logger.info("[Stage 4] DRY RUN — would write agent report to %s", gcs_uri)
         return gcs_uri
 
     client = get_storage_client()
-    client.upload_bytes(
+    _ = client.upload_bytes(
         bucket=bucket,
         blob_path=blob_path,
         data=report_content.encode("utf-8"),
@@ -115,32 +115,8 @@ def run_stage4(
     )
 
     try:
-        # In production: dispatch to trading-agent-service via its task API
-        # For now: write a structured markdown report from the deviation data directly
-        # (trading-agent-service integration is wired in Phase 6)
-        agent_report = f"# Agent Analysis Report — {date}\n\n"
-        agent_report += f"**Generated:** {datetime.now(UTC).isoformat()}\n\n"
-        agent_report += f"**Total Deviations:** {total_deviations}\n\n"
-
-        for stage_report in stage_reports:
-            if stage_report.deviations:
-                agent_report += (
-                    f"## {stage_report.stage.value} ({len(stage_report.deviations)} deviations)\n\n"
-                )
-                for d in stage_report.deviations:
-                    agent_report += f"- **{d.metric_name}**: {d.description}\n"
-                    agent_report += (
-                        f"  - Actual: `{d.actual_value:.4f}`, Threshold: `{d.threshold}`\n"
-                    )
-                agent_report += "\n"
-
-        if total_deviations == 0:
-            agent_report += (
-                "## Summary\n\nAll metrics within acceptable thresholds. No action required.\n"
-            )
-        else:
-            agent_report += "## Summary\n\nDeviations detected above alert thresholds. "
-            agent_report += "Review individual stage reports and investigate root causes.\n"
+        # Build analysis prompt (dispatched to trading-agent-service in Phase 6)
+        agent_report = _build_agent_prompt(date, stage_reports)
 
         gcs_uri = _write_agent_report(config.recon_bucket, date, agent_report, dry_run)
 

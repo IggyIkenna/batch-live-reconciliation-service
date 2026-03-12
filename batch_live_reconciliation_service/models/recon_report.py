@@ -33,7 +33,9 @@ class ReconStatus(StrEnum):
     SKIPPED = "skipped"
 
 
-class DeviationRecord(BaseModel):
+class DeviationRecord(
+    BaseModel
+):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
     """A single metric deviation above threshold."""
 
     metric_name: str
@@ -45,7 +47,9 @@ class DeviationRecord(BaseModel):
     instrument_id: str | None = None
 
 
-class StageReport(BaseModel):
+class StageReport(
+    BaseModel
+):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
     """Results for a single reconciliation stage."""
 
     stage: ReconStage
@@ -66,7 +70,9 @@ class StageReport(BaseModel):
         return self.status == ReconStatus.PASSED
 
 
-class ReconReport(BaseModel):
+class ReconReport(
+    BaseModel
+):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
     """Full T+1 reconciliation run report."""
 
     date: str  # YYYY-MM-DD

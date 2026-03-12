@@ -128,13 +128,14 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
             details={"date": date, "run_id": run_id, "total_deviations": total_deviations},
         )
     else:
+        failed_stages_str = ", ".join(s.value for s in report.failed_stages)
         log_event(
             "FAILED",
             details={
                 "date": date,
                 "run_id": run_id,
                 "total_deviations": total_deviations,
-                "failed_stages": [s.value for s in report.failed_stages],
+                "failed_stages": failed_stages_str,
             },
         )
 
