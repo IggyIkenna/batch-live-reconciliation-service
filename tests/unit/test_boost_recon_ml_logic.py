@@ -21,7 +21,9 @@ from batch_live_reconciliation_service.stages.stage1_ml_recon import (
 
 
 def test_compute_metrics_empty_live_returns_zero_coverage() -> None:
-    batch = [{"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}]
+    batch = [
+        {"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}
+    ]
     result = _compute_metrics(batch, [])
     assert result["instrument_coverage_pct"] == 0.0
     assert result["signal_direction_match_rate"] == 0.0
@@ -48,8 +50,12 @@ def test_compute_metrics_perfect_match() -> None:
 
 
 def test_compute_metrics_direction_mismatch() -> None:
-    batch = [{"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}]
-    live = [{"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": -1, "magnitude": 0.5}]
+    batch = [
+        {"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}
+    ]
+    live = [
+        {"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": -1, "magnitude": 0.5}
+    ]
     result = _compute_metrics(batch, live)
     assert result["signal_direction_match_rate"] == 0.0
 
@@ -76,8 +82,12 @@ def test_compute_metrics_magnitude_mae() -> None:
 
 def test_compute_metrics_keying_uses_instrument_and_timeframe() -> None:
     # Same instrument, different timeframes — should NOT match
-    batch = [{"instrument_id": "BTC-USD", "timeframe": "5m", "signal_direction": 1, "magnitude": 0.5}]
-    live = [{"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}]
+    batch = [
+        {"instrument_id": "BTC-USD", "timeframe": "5m", "signal_direction": 1, "magnitude": 0.5}
+    ]
+    live = [
+        {"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}
+    ]
     result = _compute_metrics(batch, live)
     assert result["instrument_coverage_pct"] == 0.0
 

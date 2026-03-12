@@ -7,12 +7,12 @@ No Any types per workspace standards.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ReconStage(str, Enum):
+class ReconStage(StrEnum):
     """T+1 reconciliation pipeline stages."""
 
     CONFIG_PULL = "config_pull"
@@ -23,7 +23,7 @@ class ReconStage(str, Enum):
     RESULTS_WRITER = "results_writer"
 
 
-class ReconStatus(str, Enum):
+class ReconStatus(StrEnum):
     """Status of a reconciliation run or stage."""
 
     PENDING = "pending"

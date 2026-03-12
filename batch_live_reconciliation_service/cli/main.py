@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="batch-live-reconciliation-service",
-        description="T+1 Batch-Live Reconciliation — nightly pipeline replay and deviation analysis",
+        description=(
+            "T+1 Batch-Live Reconciliation — nightly pipeline replay and deviation analysis"
+        ),
     )
     parser.add_argument(
         "--date",

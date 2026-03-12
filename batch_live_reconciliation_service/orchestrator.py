@@ -123,9 +123,19 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
     )
 
     if report.status == ReconStatus.PASSED:
-        log_event("STOPPED", details={"date": date, "run_id": run_id, "total_deviations": total_deviations})
+        log_event(
+            "STOPPED",
+            details={"date": date, "run_id": run_id, "total_deviations": total_deviations},
+        )
     else:
-        log_event("FAILED", details={"date": date, "run_id": run_id, "total_deviations": total_deviations,
-                                      "failed_stages": [s.value for s in report.failed_stages]})
+        log_event(
+            "FAILED",
+            details={
+                "date": date,
+                "run_id": run_id,
+                "total_deviations": total_deviations,
+                "failed_stages": [s.value for s in report.failed_stages],
+            },
+        )
 
     return report

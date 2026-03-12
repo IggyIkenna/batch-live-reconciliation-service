@@ -85,11 +85,13 @@ def _compute_metrics(
     # P&L delta from position snapshots
     batch_pnl = sum(
         float(cast(float, e.get("unrealized_pnl", 0.0)))
-        for e in batch_events if e.get("event_type") == "POSITION_SNAPSHOT"
+        for e in batch_events
+        if e.get("event_type") == "POSITION_SNAPSHOT"
     )
     live_pnl = sum(
         float(cast(float, e.get("unrealized_pnl", 0.0)))
-        for e in live_events if e.get("event_type") == "POSITION_SNAPSHOT"
+        for e in live_events
+        if e.get("event_type") == "POSITION_SNAPSHOT"
     )
     notional = abs(live_pnl) or 1.0
     pnl_delta = abs(batch_pnl - live_pnl) / notional
@@ -97,11 +99,13 @@ def _compute_metrics(
     # Max position deviation
     batch_positions: dict[str, float] = {
         str(e.get("instrument_id", "")): float(cast(float, e.get("net_position", 0.0)))
-        for e in batch_events if e.get("event_type") == "POSITION_SNAPSHOT"
+        for e in batch_events
+        if e.get("event_type") == "POSITION_SNAPSHOT"
     }
     live_positions: dict[str, float] = {
         str(e.get("instrument_id", "")): float(cast(float, e.get("net_position", 0.0)))
-        for e in live_events if e.get("event_type") == "POSITION_SNAPSHOT"
+        for e in live_events
+        if e.get("event_type") == "POSITION_SNAPSHOT"
     }
     all_insts = set(batch_positions) | set(live_positions)
     pos_deltas = [abs(batch_positions.get(i, 0.0) - live_positions.get(i, 0.0)) for i in all_insts]
@@ -110,11 +114,13 @@ def _compute_metrics(
     # VaR delta
     batch_var = sum(
         float(cast(float, e.get("var_1d", 0.0)))
-        for e in batch_events if e.get("event_type") == "RISK_SNAPSHOT"
+        for e in batch_events
+        if e.get("event_type") == "RISK_SNAPSHOT"
     )
     live_var = sum(
         float(cast(float, e.get("var_1d", 0.0)))
-        for e in live_events if e.get("event_type") == "RISK_SNAPSHOT"
+        for e in live_events
+        if e.get("event_type") == "RISK_SNAPSHOT"
     )
     var_delta = abs(batch_var - live_var) / max(abs(live_var), 1.0)
 
@@ -133,55 +139,63 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
     deviations: list[DeviationRecord] = []
 
     if metrics["instruction_alignment_pct"] < t.instruction_alignment_pct_min:
-        deviations.append(DeviationRecord(
-            metric_name="instruction_alignment_pct",
-            stage=ReconStage.STRATEGY_RECON,
-            actual_value=metrics["instruction_alignment_pct"],
-            threshold=t.instruction_alignment_pct_min,
-            direction="below",
-            description=(
-                f"Instruction alignment {metrics['instruction_alignment_pct']:.1%} "
-                f"< {t.instruction_alignment_pct_min:.0%}"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="instruction_alignment_pct",
+                stage=ReconStage.STRATEGY_RECON,
+                actual_value=metrics["instruction_alignment_pct"],
+                threshold=t.instruction_alignment_pct_min,
+                direction="below",
+                description=(
+                    f"Instruction alignment {metrics['instruction_alignment_pct']:.1%} "
+                    f"< {t.instruction_alignment_pct_min:.0%}"
+                ),
+            )
+        )
 
     if metrics["benchmark_pnl_delta"] > t.benchmark_pnl_delta_max:
-        deviations.append(DeviationRecord(
-            metric_name="benchmark_pnl_delta",
-            stage=ReconStage.STRATEGY_RECON,
-            actual_value=metrics["benchmark_pnl_delta"],
-            threshold=t.benchmark_pnl_delta_max,
-            direction="above",
-            description=(
-                f"Benchmark P&L delta {metrics['benchmark_pnl_delta']:.1%} "
-                f"> {t.benchmark_pnl_delta_max:.0%} of notional"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="benchmark_pnl_delta",
+                stage=ReconStage.STRATEGY_RECON,
+                actual_value=metrics["benchmark_pnl_delta"],
+                threshold=t.benchmark_pnl_delta_max,
+                direction="above",
+                description=(
+                    f"Benchmark P&L delta {metrics['benchmark_pnl_delta']:.1%} "
+                    f"> {t.benchmark_pnl_delta_max:.0%} of notional"
+                ),
+            )
+        )
 
     if metrics["position_snapshot_delta"] > t.position_snapshot_delta_max:
-        deviations.append(DeviationRecord(
-            metric_name="position_snapshot_delta",
-            stage=ReconStage.STRATEGY_RECON,
-            actual_value=metrics["position_snapshot_delta"],
-            threshold=t.position_snapshot_delta_max,
-            direction="above",
-            description=(
-                f"Max position delta {metrics['position_snapshot_delta']:.2f} "
-                f"> {t.position_snapshot_delta_max} units"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="position_snapshot_delta",
+                stage=ReconStage.STRATEGY_RECON,
+                actual_value=metrics["position_snapshot_delta"],
+                threshold=t.position_snapshot_delta_max,
+                direction="above",
+                description=(
+                    f"Max position delta {metrics['position_snapshot_delta']:.2f} "
+                    f"> {t.position_snapshot_delta_max} units"
+                ),
+            )
+        )
 
     if metrics["var_delta_pct"] > t.var_delta_pct_max:
-        deviations.append(DeviationRecord(
-            metric_name="var_delta_pct",
-            stage=ReconStage.STRATEGY_RECON,
-            actual_value=metrics["var_delta_pct"],
-            threshold=t.var_delta_pct_max,
-            direction="above",
-            description=(
-                f"VaR delta {metrics['var_delta_pct']:.1%} > {t.var_delta_pct_max:.0%}"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="var_delta_pct",
+                stage=ReconStage.STRATEGY_RECON,
+                actual_value=metrics["var_delta_pct"],
+                threshold=t.var_delta_pct_max,
+                direction="above",
+                description=(
+                    f"VaR delta {metrics['var_delta_pct']:.1%} > {t.var_delta_pct_max:.0%}"
+                ),
+            )
+        )
 
     return deviations
 
@@ -215,7 +229,11 @@ def run_stage2(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
 
     log_event(
         "PROCESSING_COMPLETED",
-        details={"stage": "stage2_strategy_recon", "status": status.value, "deviations": len(deviations)},
+        details={
+            "stage": "stage2_strategy_recon",
+            "status": status.value,
+            "deviations": len(deviations),
+        },
     )
     return StageReport(
         stage=ReconStage.STRATEGY_RECON,

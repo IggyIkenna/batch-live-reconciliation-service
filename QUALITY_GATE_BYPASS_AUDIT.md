@@ -11,4 +11,3 @@ None.
 ## 2.3 Basedpyright Exceptions
 
 None.
-

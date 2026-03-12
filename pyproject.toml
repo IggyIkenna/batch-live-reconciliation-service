@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "batch-live-reconciliation-service"
 version = "0.1.0"
 description = "T+1 nightly batch-live reconciliation orchestrator"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "pydantic<3.0.0,>=2.12.5",
     "unified-config-interface",

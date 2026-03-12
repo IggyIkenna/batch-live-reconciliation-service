@@ -67,7 +67,10 @@ def _make_stage_report(
 def test_load_index_returns_empty_list_on_error() -> None:
     mock_client = MagicMock()
     mock_client.download_bytes.side_effect = RuntimeError("not found")
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client):
+    with patch(
+        "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+        return_value=mock_client,
+    ):
         result = _load_index("test-bucket")
     assert result == []
 
@@ -76,7 +79,10 @@ def test_load_index_parses_json() -> None:
     data = [{"date": "2026-03-10", "status": "passed"}]
     mock_client = MagicMock()
     mock_client.download_bytes.return_value = json.dumps(data).encode("utf-8")
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client):
+    with patch(
+        "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+        return_value=mock_client,
+    ):
         result = _load_index("test-bucket")
     assert len(result) == 1
     assert result[0]["date"] == "2026-03-10"
@@ -85,7 +91,10 @@ def test_load_index_parses_json() -> None:
 def test_load_index_invalid_json_returns_empty() -> None:
     mock_client = MagicMock()
     mock_client.download_bytes.return_value = b"not valid json {{{"
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client):
+    with patch(
+        "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+        return_value=mock_client,
+    ):
         result = _load_index("test-bucket")
     assert result == []
 
@@ -115,8 +124,12 @@ def test_run_stage5_dry_run_sets_summary_gcs_path() -> None:
 def test_run_stage5_dry_run_no_gcs_writes() -> None:
     config = _make_config()
     report = _make_report()
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client") as mock_gcs, \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client"
+        ) as mock_gcs,
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         run_stage5(config, report, dry_run=True)
     mock_gcs.assert_not_called()
 
@@ -128,14 +141,22 @@ def test_run_stage5_dry_run_no_gcs_writes() -> None:
 
 def test_run_stage5_uploads_summary_json() -> None:
     config = _make_config()
-    stages = [_make_stage_report(ReconStage.ML_RECON), _make_stage_report(ReconStage.STRATEGY_RECON)]
+    stages = [
+        _make_stage_report(ReconStage.ML_RECON),
+        _make_stage_report(ReconStage.STRATEGY_RECON),
+    ]
     report = _make_report(date="2026-03-11", stages=stages)
 
     mock_client = MagicMock()
     # Empty existing index
     mock_client.download_bytes.return_value = b"[]"
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         result = run_stage5(config, report, dry_run=False)
 
     assert result.status == ReconStatus.PASSED
@@ -157,8 +178,13 @@ def test_run_stage5_summary_contains_all_stage_data() -> None:
     mock_client.download_bytes.return_value = b"[]"
     mock_client.upload_bytes.side_effect = lambda **kw: uploaded_data.append(kw["data"])
 
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         run_stage5(config, report, dry_run=False)
 
     # First upload is the summary JSON
@@ -181,8 +207,13 @@ def test_run_stage5_index_updated_with_new_entry() -> None:
     mock_client.download_bytes.return_value = json.dumps(existing_index).encode("utf-8")
     mock_client.upload_bytes.side_effect = lambda **kw: uploaded_data.append(kw["data"])
 
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         run_stage5(config, report, dry_run=False)
 
     # Second upload is the index
@@ -204,8 +235,13 @@ def test_run_stage5_index_deduplicates_date() -> None:
     mock_client.download_bytes.return_value = json.dumps(existing_index).encode("utf-8")
     mock_client.upload_bytes.side_effect = lambda **kw: uploaded_data.append(kw["data"])
 
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         run_stage5(config, report, dry_run=False)
 
     updated_index = json.loads(uploaded_data[1].decode("utf-8"))
@@ -223,8 +259,13 @@ def test_run_stage5_gcs_upload_error_returns_failed() -> None:
     mock_client.download_bytes.return_value = b"[]"
     mock_client.upload_bytes.side_effect = RuntimeError("GCS write failed")
 
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         result = run_stage5(config, report, dry_run=False)
 
     assert result.status == ReconStatus.FAILED
@@ -255,8 +296,13 @@ def test_run_stage5_metrics_total_deviations() -> None:
 
     mock_client = MagicMock()
     mock_client.download_bytes.return_value = b"[]"
-    with patch("batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage5_results_writer.log_event"),
+    ):
         result = run_stage5(config, report, dry_run=False)
 
     assert result.metrics["total_deviations"] == 1.0

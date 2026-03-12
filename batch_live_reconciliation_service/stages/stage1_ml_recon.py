@@ -87,13 +87,13 @@ def _compute_metrics(
 
     for key in matched_keys:
         b = batch_idx[key]
-        l = live_idx[key]
+        live_entry = live_idx[key]
         b_dir = int(cast(int, b.get("signal_direction", 0)))
-        l_dir = int(cast(int, l.get("signal_direction", 0)))
+        l_dir = int(cast(int, live_entry.get("signal_direction", 0)))
         if b_dir == l_dir:
             direction_matches += 1
         b_mag = float(cast(float, b.get("magnitude", 0.0)))
-        l_mag = float(cast(float, l.get("magnitude", 0.0)))
+        l_mag = float(cast(float, live_entry.get("magnitude", 0.0)))
         magnitude_errors.append(abs(b_mag - l_mag))
 
     direction_match_rate = direction_matches / max(len(matched_keys), 1)
@@ -115,56 +115,64 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
     t = ML_THRESHOLDS
 
     if metrics["signal_direction_match_rate"] < t.signal_direction_match_rate_min:
-        deviations.append(DeviationRecord(
-            metric_name="signal_direction_match_rate",
-            stage=ReconStage.ML_RECON,
-            actual_value=metrics["signal_direction_match_rate"],
-            threshold=t.signal_direction_match_rate_min,
-            direction="below",
-            description=(
-                f"Signal direction match rate {metrics['signal_direction_match_rate']:.1%} "
-                f"< {t.signal_direction_match_rate_min:.0%} threshold"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="signal_direction_match_rate",
+                stage=ReconStage.ML_RECON,
+                actual_value=metrics["signal_direction_match_rate"],
+                threshold=t.signal_direction_match_rate_min,
+                direction="below",
+                description=(
+                    f"Signal direction match rate {metrics['signal_direction_match_rate']:.1%} "
+                    f"< {t.signal_direction_match_rate_min:.0%} threshold"
+                ),
+            )
+        )
 
     if metrics["signal_magnitude_mae"] > t.signal_magnitude_mae_max:
-        deviations.append(DeviationRecord(
-            metric_name="signal_magnitude_mae",
-            stage=ReconStage.ML_RECON,
-            actual_value=metrics["signal_magnitude_mae"],
-            threshold=t.signal_magnitude_mae_max,
-            direction="above",
-            description=(
-                f"Signal magnitude MAE {metrics['signal_magnitude_mae']:.3f} "
-                f"> {t.signal_magnitude_mae_max} threshold"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="signal_magnitude_mae",
+                stage=ReconStage.ML_RECON,
+                actual_value=metrics["signal_magnitude_mae"],
+                threshold=t.signal_magnitude_mae_max,
+                direction="above",
+                description=(
+                    f"Signal magnitude MAE {metrics['signal_magnitude_mae']:.3f} "
+                    f"> {t.signal_magnitude_mae_max} threshold"
+                ),
+            )
+        )
 
     if metrics["instrument_coverage_pct"] < t.instrument_coverage_pct_min:
-        deviations.append(DeviationRecord(
-            metric_name="instrument_coverage_pct",
-            stage=ReconStage.ML_RECON,
-            actual_value=metrics["instrument_coverage_pct"],
-            threshold=t.instrument_coverage_pct_min,
-            direction="below",
-            description=(
-                f"Instrument coverage {metrics['instrument_coverage_pct']:.1%} "
-                f"< {t.instrument_coverage_pct_min:.0%} threshold"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="instrument_coverage_pct",
+                stage=ReconStage.ML_RECON,
+                actual_value=metrics["instrument_coverage_pct"],
+                threshold=t.instrument_coverage_pct_min,
+                direction="below",
+                description=(
+                    f"Instrument coverage {metrics['instrument_coverage_pct']:.1%} "
+                    f"< {t.instrument_coverage_pct_min:.0%} threshold"
+                ),
+            )
+        )
 
     if metrics["latency_delta_ms"] > t.latency_delta_ms_max:
-        deviations.append(DeviationRecord(
-            metric_name="latency_delta_ms",
-            stage=ReconStage.ML_RECON,
-            actual_value=metrics["latency_delta_ms"],
-            threshold=t.latency_delta_ms_max,
-            direction="above",
-            description=(
-                f"Median latency delta {metrics['latency_delta_ms']:.0f}ms "
-                f"> {t.latency_delta_ms_max:.0f}ms threshold"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="latency_delta_ms",
+                stage=ReconStage.ML_RECON,
+                actual_value=metrics["latency_delta_ms"],
+                threshold=t.latency_delta_ms_max,
+                direction="above",
+                description=(
+                    f"Median latency delta {metrics['latency_delta_ms']:.0f}ms "
+                    f"> {t.latency_delta_ms_max:.0f}ms threshold"
+                ),
+            )
+        )
 
     return deviations
 

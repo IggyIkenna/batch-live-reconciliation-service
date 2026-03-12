@@ -59,7 +59,10 @@ def _patch_all_stages(
 ) -> list[object]:
     """Return list of context managers patching all 6 stages + config + observability."""
     return [
-        patch("batch_live_reconciliation_service.orchestrator.get_recon_config", return_value=_make_mock_config()),
+        patch(
+            "batch_live_reconciliation_service.orchestrator.get_recon_config",
+            return_value=_make_mock_config(),
+        ),
         patch("batch_live_reconciliation_service.orchestrator._setup_observability"),
         patch("batch_live_reconciliation_service.orchestrator.log_event"),
         patch("batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0),
@@ -85,8 +88,17 @@ def test_run_reconciliation_all_pass_returns_passed_report() -> None:
     s5 = _passed_stage(ReconStage.RESULTS_WRITER)
 
     patches = _patch_all_stages(s0, s1, s2, s3, s4, s5)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert isinstance(report, ReconReport)
@@ -104,8 +116,17 @@ def test_run_reconciliation_sets_run_id() -> None:
     s5 = _passed_stage(ReconStage.RESULTS_WRITER)
 
     patches = _patch_all_stages(s0, s1, s2, s3, s4, s5)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.run_id != ""
@@ -113,14 +134,30 @@ def test_run_reconciliation_sets_run_id() -> None:
 
 
 def test_run_reconciliation_sets_completed_at() -> None:
-    stages = [_passed_stage(s) for s in [
-        ReconStage.CONFIG_PULL, ReconStage.ML_RECON, ReconStage.STRATEGY_RECON,
-        ReconStage.EXECUTION_RECON, ReconStage.AGENT_ANALYSIS, ReconStage.RESULTS_WRITER
-    ]]
+    stages = [
+        _passed_stage(s)
+        for s in [
+            ReconStage.CONFIG_PULL,
+            ReconStage.ML_RECON,
+            ReconStage.STRATEGY_RECON,
+            ReconStage.EXECUTION_RECON,
+            ReconStage.AGENT_ANALYSIS,
+            ReconStage.RESULTS_WRITER,
+        ]
+    ]
 
     patches = _patch_all_stages(*stages)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.completed_at is not None
@@ -134,11 +171,18 @@ def test_run_reconciliation_sets_completed_at() -> None:
 def test_run_reconciliation_aborts_on_stage0_failure() -> None:
     s0 = _failed_stage(ReconStage.CONFIG_PULL, "upstream data missing")
 
-    with patch("batch_live_reconciliation_service.orchestrator.get_recon_config", return_value=_make_mock_config()), \
-         patch("batch_live_reconciliation_service.orchestrator._setup_observability"), \
-         patch("batch_live_reconciliation_service.orchestrator.log_event"), \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0) as mock_s0, \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage1") as mock_s1:
+    with (
+        patch(
+            "batch_live_reconciliation_service.orchestrator.get_recon_config",
+            return_value=_make_mock_config(),
+        ),
+        patch("batch_live_reconciliation_service.orchestrator._setup_observability"),
+        patch("batch_live_reconciliation_service.orchestrator.log_event"),
+        patch(
+            "batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0
+        ) as mock_s0,
+        patch("batch_live_reconciliation_service.orchestrator.run_stage1") as mock_s1,
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.status == ReconStatus.FAILED
@@ -149,10 +193,15 @@ def test_run_reconciliation_aborts_on_stage0_failure() -> None:
 def test_run_reconciliation_stage0_failure_sets_error_path() -> None:
     s0 = _failed_stage(ReconStage.CONFIG_PULL, "upstream data missing")
 
-    with patch("batch_live_reconciliation_service.orchestrator.get_recon_config", return_value=_make_mock_config()), \
-         patch("batch_live_reconciliation_service.orchestrator._setup_observability"), \
-         patch("batch_live_reconciliation_service.orchestrator.log_event"), \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0):
+    with (
+        patch(
+            "batch_live_reconciliation_service.orchestrator.get_recon_config",
+            return_value=_make_mock_config(),
+        ),
+        patch("batch_live_reconciliation_service.orchestrator._setup_observability"),
+        patch("batch_live_reconciliation_service.orchestrator.log_event"),
+        patch("batch_live_reconciliation_service.orchestrator.run_stage0", return_value=s0),
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.completed_at is not None
@@ -173,8 +222,17 @@ def test_run_reconciliation_stage1_failure_marks_overall_failed() -> None:
     s5 = _passed_stage(ReconStage.RESULTS_WRITER)
 
     patches = _patch_all_stages(s0, s1, s2, s3, s4, s5)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.status == ReconStatus.FAILED
@@ -190,8 +248,17 @@ def test_run_reconciliation_multiple_stage_failures() -> None:
     s5 = _passed_stage(ReconStage.RESULTS_WRITER)
 
     patches = _patch_all_stages(s0, s1, s2, s3, s4, s5)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.status == ReconStatus.FAILED
@@ -217,8 +284,17 @@ def test_run_reconciliation_propagates_agent_report_gcs_path() -> None:
     s5 = _passed_stage(ReconStage.RESULTS_WRITER)
 
     patches = _patch_all_stages(s0, s1, s2, s3, s4, s5)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.agent_report_gcs_path == "gs://bucket/agent_report.md"
@@ -238,8 +314,17 @@ def test_run_reconciliation_propagates_summary_gcs_path() -> None:
     )
 
     patches = _patch_all_stages(s0, s1, s2, s3, s4, s5)
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], \
-         patches[6], patches[7], patches[8]:
+    with (
+        patches[0],
+        patches[1],
+        patches[2],
+        patches[3],
+        patches[4],
+        patches[5],
+        patches[6],
+        patches[7],
+        patches[8],
+    ):
         report = run_reconciliation("2026-03-11")
 
     assert report.summary_gcs_path == "gs://bucket/summary.json"
@@ -251,20 +336,36 @@ def test_run_reconciliation_propagates_summary_gcs_path() -> None:
 
 
 def test_run_reconciliation_passes_dry_run_to_stages() -> None:
-    stages = [_passed_stage(s) for s in [
-        ReconStage.CONFIG_PULL, ReconStage.ML_RECON, ReconStage.STRATEGY_RECON,
-        ReconStage.EXECUTION_RECON, ReconStage.AGENT_ANALYSIS, ReconStage.RESULTS_WRITER
-    ]]
+    stages = [
+        _passed_stage(s)
+        for s in [
+            ReconStage.CONFIG_PULL,
+            ReconStage.ML_RECON,
+            ReconStage.STRATEGY_RECON,
+            ReconStage.EXECUTION_RECON,
+            ReconStage.AGENT_ANALYSIS,
+            ReconStage.RESULTS_WRITER,
+        ]
+    ]
 
-    with patch("batch_live_reconciliation_service.orchestrator.get_recon_config", return_value=_make_mock_config()), \
-         patch("batch_live_reconciliation_service.orchestrator._setup_observability"), \
-         patch("batch_live_reconciliation_service.orchestrator.log_event"), \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage0", return_value=stages[0]) as mock_s0, \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage1", return_value=stages[1]) as mock_s1, \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage2", return_value=stages[2]), \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage3", return_value=stages[3]), \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage4", return_value=stages[4]), \
-         patch("batch_live_reconciliation_service.orchestrator.run_stage5", return_value=stages[5]):
+    with (
+        patch(
+            "batch_live_reconciliation_service.orchestrator.get_recon_config",
+            return_value=_make_mock_config(),
+        ),
+        patch("batch_live_reconciliation_service.orchestrator._setup_observability"),
+        patch("batch_live_reconciliation_service.orchestrator.log_event"),
+        patch(
+            "batch_live_reconciliation_service.orchestrator.run_stage0", return_value=stages[0]
+        ) as mock_s0,
+        patch(
+            "batch_live_reconciliation_service.orchestrator.run_stage1", return_value=stages[1]
+        ) as mock_s1,
+        patch("batch_live_reconciliation_service.orchestrator.run_stage2", return_value=stages[2]),
+        patch("batch_live_reconciliation_service.orchestrator.run_stage3", return_value=stages[3]),
+        patch("batch_live_reconciliation_service.orchestrator.run_stage4", return_value=stages[4]),
+        patch("batch_live_reconciliation_service.orchestrator.run_stage5", return_value=stages[5]),
+    ):
         run_reconciliation("2026-03-11", dry_run=True)
 
     _, s0_kwargs = mock_s0.call_args

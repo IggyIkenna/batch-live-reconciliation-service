@@ -104,13 +104,14 @@ def _compute_metrics(
     # Algo selection accuracy
     algo_events = [e for e in live_events if e.get("event_type") == "ORDER_SUBMITTED"]
     algo_correct = sum(
-        1 for e in algo_events
-        if str(e.get("algo_used", "")) == str(e.get("algo_configured", ""))
+        1 for e in algo_events if str(e.get("algo_used", "")) == str(e.get("algo_configured", ""))
     )
     algo_accuracy = algo_correct / max(len(algo_events), 1)
 
     # P99 latency from live orders
-    latencies = [float(cast(float, e.get("latency_ms", 0.0))) for e in live_fills if e.get("latency_ms")]
+    latencies = [
+        float(cast(float, e.get("latency_ms", 0.0))) for e in live_fills if e.get("latency_ms")
+    ]
     latencies.sort()
     p99_latency = latencies[int(len(latencies) * 0.99)] if latencies else 0.0
 
@@ -130,35 +131,69 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
     deviations: list[DeviationRecord] = []
 
     checks: list[tuple[str, float, float, str, str]] = [
-        ("alpha_pnl_gap", metrics["alpha_pnl_gap"], t.alpha_pnl_gap_max, "above",
-         f"Alpha P&L gap {metrics['alpha_pnl_gap']:.1%} > {t.alpha_pnl_gap_max:.0%} of notional"),
-        ("fill_rate_delta", metrics["fill_rate_delta"], t.fill_rate_delta_max, "above",
-         f"Fill rate delta {metrics['fill_rate_delta']:.1%} > {t.fill_rate_delta_max:.0%}"),
-        ("slippage_delta_bps", metrics["slippage_delta_bps"], t.slippage_delta_bps_max, "above",
-         f"Slippage delta {metrics['slippage_delta_bps']:.1f}bps > {t.slippage_delta_bps_max:.0f}bps"),
-        ("order_latency_p99_ms", metrics["order_latency_p99_ms"], t.order_latency_p99_ms_max, "above",
-         f"P99 latency {metrics['order_latency_p99_ms']:.0f}ms > {t.order_latency_p99_ms_max:.0f}ms"),
+        (
+            "alpha_pnl_gap",
+            metrics["alpha_pnl_gap"],
+            t.alpha_pnl_gap_max,
+            "above",
+            f"Alpha P&L gap {metrics['alpha_pnl_gap']:.1%} > {t.alpha_pnl_gap_max:.0%} of notional",
+        ),
+        (
+            "fill_rate_delta",
+            metrics["fill_rate_delta"],
+            t.fill_rate_delta_max,
+            "above",
+            f"Fill rate delta {metrics['fill_rate_delta']:.1%} > {t.fill_rate_delta_max:.0%}",
+        ),
+        (
+            "slippage_delta_bps",
+            metrics["slippage_delta_bps"],
+            t.slippage_delta_bps_max,
+            "above",
+            (
+                f"Slippage delta {metrics['slippage_delta_bps']:.1f}bps"
+                f" > {t.slippage_delta_bps_max:.0f}bps"
+            ),
+        ),
+        (
+            "order_latency_p99_ms",
+            metrics["order_latency_p99_ms"],
+            t.order_latency_p99_ms_max,
+            "above",
+            (
+                f"P99 latency {metrics['order_latency_p99_ms']:.0f}ms"
+                f" > {t.order_latency_p99_ms_max:.0f}ms"
+            ),
+        ),
     ]
 
     for name, actual, threshold, direction, desc in checks:
         if direction == "above" and actual > threshold:
-            deviations.append(DeviationRecord(
-                metric_name=name, stage=ReconStage.EXECUTION_RECON,
-                actual_value=actual, threshold=threshold, direction=direction, description=desc,
-            ))
+            deviations.append(
+                DeviationRecord(
+                    metric_name=name,
+                    stage=ReconStage.EXECUTION_RECON,
+                    actual_value=actual,
+                    threshold=threshold,
+                    direction=direction,
+                    description=desc,
+                )
+            )
 
     if metrics["algo_selection_accuracy"] < t.algo_selection_accuracy_min:
-        deviations.append(DeviationRecord(
-            metric_name="algo_selection_accuracy",
-            stage=ReconStage.EXECUTION_RECON,
-            actual_value=metrics["algo_selection_accuracy"],
-            threshold=t.algo_selection_accuracy_min,
-            direction="below",
-            description=(
-                f"Algo selection accuracy {metrics['algo_selection_accuracy']:.1%} "
-                f"< {t.algo_selection_accuracy_min:.0%}"
-            ),
-        ))
+        deviations.append(
+            DeviationRecord(
+                metric_name="algo_selection_accuracy",
+                stage=ReconStage.EXECUTION_RECON,
+                actual_value=metrics["algo_selection_accuracy"],
+                threshold=t.algo_selection_accuracy_min,
+                direction="below",
+                description=(
+                    f"Algo selection accuracy {metrics['algo_selection_accuracy']:.1%} "
+                    f"< {t.algo_selection_accuracy_min:.0%}"
+                ),
+            )
+        )
 
     return deviations
 
@@ -192,7 +227,11 @@ def run_stage3(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
 
     log_event(
         "PROCESSING_COMPLETED",
-        details={"stage": "stage3_execution_recon", "status": status.value, "deviations": len(deviations)},
+        details={
+            "stage": "stage3_execution_recon",
+            "status": status.value,
+            "deviations": len(deviations),
+        },
     )
     return StageReport(
         stage=ReconStage.EXECUTION_RECON,

@@ -108,12 +108,13 @@ def run_stage4(
     logger.info("[Stage 4] Agent analysis for date=%s", date)
 
     total_deviations = sum(len(s.deviations) for s in stage_reports)
-    logger.info("[Stage 4] Analysing %d total deviations across %d stages", total_deviations, len(stage_reports))
+    logger.info(
+        "[Stage 4] Analysing %d total deviations across %d stages",
+        total_deviations,
+        len(stage_reports),
+    )
 
     try:
-        # Build analysis prompt
-        prompt = _build_agent_prompt(date, stage_reports)
-
         # In production: dispatch to trading-agent-service via its task API
         # For now: write a structured markdown report from the deviation data directly
         # (trading-agent-service integration is wired in Phase 6)
@@ -123,14 +124,20 @@ def run_stage4(
 
         for stage_report in stage_reports:
             if stage_report.deviations:
-                agent_report += f"## {stage_report.stage.value} ({len(stage_report.deviations)} deviations)\n\n"
+                agent_report += (
+                    f"## {stage_report.stage.value} ({len(stage_report.deviations)} deviations)\n\n"
+                )
                 for d in stage_report.deviations:
                     agent_report += f"- **{d.metric_name}**: {d.description}\n"
-                    agent_report += f"  - Actual: `{d.actual_value:.4f}`, Threshold: `{d.threshold}`\n"
+                    agent_report += (
+                        f"  - Actual: `{d.actual_value:.4f}`, Threshold: `{d.threshold}`\n"
+                    )
                 agent_report += "\n"
 
         if total_deviations == 0:
-            agent_report += "## Summary\n\nAll metrics within acceptable thresholds. No action required.\n"
+            agent_report += (
+                "## Summary\n\nAll metrics within acceptable thresholds. No action required.\n"
+            )
         else:
             agent_report += "## Summary\n\nDeviations detected above alert thresholds. "
             agent_report += "Review individual stage reports and investigate root causes.\n"
@@ -152,7 +159,9 @@ def run_stage4(
 
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, OSError) as e:
         logger.exception("[Stage 4] Agent analysis failed: %s", e)
-        log_event("PROCESSING_COMPLETED", details={"stage": "stage4_agent_analysis", "status": "FAILED"})
+        log_event(
+            "PROCESSING_COMPLETED", details={"stage": "stage4_agent_analysis", "status": "FAILED"}
+        )
         return StageReport(
             stage=ReconStage.AGENT_ANALYSIS,
             status=ReconStatus.FAILED,

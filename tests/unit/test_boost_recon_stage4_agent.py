@@ -129,7 +129,9 @@ def test_write_agent_report_dry_run_returns_gcs_uri() -> None:
 
 
 def test_write_agent_report_dry_run_no_gcs_call() -> None:
-    with patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client") as mock_gcs:
+    with patch(
+        "batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client"
+    ) as mock_gcs:
         _write_agent_report("my-bucket", "2026-03-11", "# Report", dry_run=True)
         mock_gcs.assert_not_called()
 
@@ -179,13 +181,16 @@ def test_run_stage4_dry_run_sets_gcs_path() -> None:
 def test_run_stage4_with_deviations_writes_report() -> None:
     config = _make_config()
     dev = _make_deviation("fill_rate_delta")
-    reports = [
-        _make_stage_report(ReconStage.ML_RECON, ReconStatus.FAILED, deviations=[dev])
-    ]
+    reports = [_make_stage_report(ReconStage.ML_RECON, ReconStatus.FAILED, deviations=[dev])]
 
     mock_client = MagicMock()
-    with patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"),
+    ):
         result = run_stage4(config, "2026-03-11", reports, dry_run=False)
 
     assert result.status == ReconStatus.PASSED
@@ -198,8 +203,13 @@ def test_run_stage4_gcs_upload_error_returns_failed() -> None:
 
     mock_client = MagicMock()
     mock_client.upload_bytes.side_effect = RuntimeError("GCS unavailable")
-    with patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"),
+    ):
         result = run_stage4(config, "2026-03-11", reports, dry_run=False)
 
     assert result.status == ReconStatus.FAILED
@@ -210,8 +220,13 @@ def test_run_stage4_gcs_upload_error_returns_failed() -> None:
 def test_run_stage4_empty_stage_reports() -> None:
     config = _make_config()
     mock_client = MagicMock()
-    with patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"),
+    ):
         result = run_stage4(config, "2026-03-11", [], dry_run=False)
 
     assert result.status == ReconStatus.PASSED
@@ -223,8 +238,10 @@ def test_run_stage4_metrics_reflect_deviation_count() -> None:
     devs = [_make_deviation(f"metric_{i}") for i in range(3)]
     reports = [_make_stage_report(ReconStage.ML_RECON, deviations=devs)]
 
-    with patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client"), \
-         patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"):
+    with (
+        patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client"),
+        patch("batch_live_reconciliation_service.stages.stage4_agent_analysis.log_event"),
+    ):
         result = run_stage4(config, "2026-03-11", reports, dry_run=True)
 
     assert result.metrics["total_deviations_analysed"] == 3.0

@@ -49,8 +49,12 @@ def test_run_stage1_dry_run_returns_passed() -> None:
 
 def test_run_stage1_dry_run_no_gcs_calls() -> None:
     config = _make_config()
-    with patch("batch_live_reconciliation_service.stages.stage1_ml_recon.get_storage_client") as mock_gcs, \
-         patch("batch_live_reconciliation_service.stages.stage1_ml_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage1_ml_recon.get_storage_client"
+        ) as mock_gcs,
+        patch("batch_live_reconciliation_service.stages.stage1_ml_recon.log_event"),
+    ):
         run_stage1(config, "2026-03-11", dry_run=True)
     mock_gcs.assert_not_called()
 
@@ -58,7 +62,9 @@ def test_run_stage1_dry_run_no_gcs_calls() -> None:
 def test_run_stage1_passes_with_perfect_data() -> None:
     config = _make_config()
     # NDJSON: one JSON object per line (not a JSON array)
-    events_json = json.dumps({"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5})
+    events_json = json.dumps(
+        {"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}
+    )
     ndjson_bytes = events_json.encode("utf-8")
 
     mock_blob = MagicMock()
@@ -69,8 +75,13 @@ def test_run_stage1_passes_with_perfect_data() -> None:
     mock_client.bucket.return_value = mock_bucket
     mock_client.download_bytes.return_value = ndjson_bytes
 
-    with patch("batch_live_reconciliation_service.stages.stage1_ml_recon.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage1_ml_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage1_ml_recon.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage1_ml_recon.log_event"),
+    ):
         result = run_stage1(config, "2026-03-11", dry_run=False)
 
     assert result.stage == ReconStage.ML_RECON
@@ -88,9 +99,16 @@ def test_run_stage1_fails_with_no_live_events() -> None:
         call_count += 1
         # First call = batch (return data), second call = live (return empty)
         if call_count == 1:
-            return json.dumps([
-                {"instrument_id": "BTC-USD", "timeframe": "1m", "signal_direction": 1, "magnitude": 0.5}
-            ]).encode("utf-8")
+            return json.dumps(
+                [
+                    {
+                        "instrument_id": "BTC-USD",
+                        "timeframe": "1m",
+                        "signal_direction": 1,
+                        "magnitude": 0.5,
+                    }
+                ]
+            ).encode("utf-8")
         return b""
 
     mock_blob = MagicMock()
@@ -101,8 +119,13 @@ def test_run_stage1_fails_with_no_live_events() -> None:
     mock_client.bucket.return_value = mock_bucket
     mock_client.download_bytes.side_effect = load_side_effect
 
-    with patch("batch_live_reconciliation_service.stages.stage1_ml_recon.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage1_ml_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage1_ml_recon.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage1_ml_recon.log_event"),
+    ):
         result = run_stage1(config, "2026-03-11", dry_run=False)
 
     # When live events are empty: coverage=0, match_rate=0, mae=999 → all breach thresholds
@@ -134,8 +157,12 @@ def test_run_stage2_dry_run_returns_passed() -> None:
 
 def test_run_stage2_dry_run_no_gcs_calls() -> None:
     config = _make_config()
-    with patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.get_storage_client") as mock_gcs, \
-         patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage2_strategy_recon.get_storage_client"
+        ) as mock_gcs,
+        patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.log_event"),
+    ):
         run_stage2(config, "2026-03-11", dry_run=True)
     mock_gcs.assert_not_called()
 
@@ -144,7 +171,12 @@ def test_run_stage2_passes_with_matching_events() -> None:
     config = _make_config()
     events = [
         {"event_type": "INSTRUCTION", "instrument_id": "BTC-USD", "side": "BUY"},
-        {"event_type": "POSITION_SNAPSHOT", "instrument_id": "BTC-USD", "net_position": 1.0, "unrealized_pnl": 100.0},
+        {
+            "event_type": "POSITION_SNAPSHOT",
+            "instrument_id": "BTC-USD",
+            "net_position": 1.0,
+            "unrealized_pnl": 100.0,
+        },
         {"event_type": "RISK_SNAPSHOT", "var_1d": 50000.0},
     ]
     ndjson = "\n".join(json.dumps(e) for e in events).encode("utf-8")
@@ -157,8 +189,13 @@ def test_run_stage2_passes_with_matching_events() -> None:
     mock_client.bucket.return_value = mock_bucket
     mock_client.download_bytes.return_value = ndjson
 
-    with patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage2_strategy_recon.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.log_event"),
+    ):
         result = run_stage2(config, "2026-03-11", dry_run=False)
 
     assert result.stage == ReconStage.STRATEGY_RECON
@@ -175,7 +212,9 @@ def test_run_stage2_result_has_timestamps() -> None:
 
 def test_run_stage2_emits_log_events() -> None:
     config = _make_config()
-    with patch("batch_live_reconciliation_service.stages.stage2_strategy_recon.log_event") as mock_log:
+    with patch(
+        "batch_live_reconciliation_service.stages.stage2_strategy_recon.log_event"
+    ) as mock_log:
         run_stage2(config, "2026-03-11", dry_run=True)
     # In dry_run mode, only PROCESSING_STARTED is emitted before early return
     assert mock_log.call_count >= 1
@@ -197,8 +236,12 @@ def test_run_stage3_dry_run_returns_passed() -> None:
 
 def test_run_stage3_dry_run_no_gcs_calls() -> None:
     config = _make_config()
-    with patch("batch_live_reconciliation_service.stages.stage3_execution_recon.get_storage_client") as mock_gcs, \
-         patch("batch_live_reconciliation_service.stages.stage3_execution_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage3_execution_recon.get_storage_client"
+        ) as mock_gcs,
+        patch("batch_live_reconciliation_service.stages.stage3_execution_recon.log_event"),
+    ):
         run_stage3(config, "2026-03-11", dry_run=True)
     mock_gcs.assert_not_called()
 
@@ -207,7 +250,13 @@ def test_run_stage3_passes_with_matching_execution_events() -> None:
     config = _make_config()
     events = [
         {"event_type": "ORDER_SUBMITTED", "algo_used": "VWAP", "algo_configured": "VWAP"},
-        {"event_type": "FILL", "fill_price": 100.0, "filled_qty": 1.0, "slippage_bps": 2.0, "latency_ms": 100.0},
+        {
+            "event_type": "FILL",
+            "fill_price": 100.0,
+            "filled_qty": 1.0,
+            "slippage_bps": 2.0,
+            "latency_ms": 100.0,
+        },
     ]
     ndjson = "\n".join(json.dumps(e) for e in events).encode("utf-8")
 
@@ -219,8 +268,13 @@ def test_run_stage3_passes_with_matching_execution_events() -> None:
     mock_client.bucket.return_value = mock_bucket
     mock_client.download_bytes.return_value = ndjson
 
-    with patch("batch_live_reconciliation_service.stages.stage3_execution_recon.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage3_execution_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage3_execution_recon.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage3_execution_recon.log_event"),
+    ):
         result = run_stage3(config, "2026-03-11", dry_run=False)
 
     assert result.stage == ReconStage.EXECUTION_RECON
@@ -253,8 +307,13 @@ def test_run_stage3_deviations_detected_with_bad_data() -> None:
     mock_client.bucket.return_value = mock_bucket
     mock_client.download_bytes.return_value = ndjson
 
-    with patch("batch_live_reconciliation_service.stages.stage3_execution_recon.get_storage_client", return_value=mock_client), \
-         patch("batch_live_reconciliation_service.stages.stage3_execution_recon.log_event"):
+    with (
+        patch(
+            "batch_live_reconciliation_service.stages.stage3_execution_recon.get_storage_client",
+            return_value=mock_client,
+        ),
+        patch("batch_live_reconciliation_service.stages.stage3_execution_recon.log_event"),
+    ):
         result = run_stage3(config, "2026-03-11", dry_run=False)
 
     # algo accuracy = 0 < 0.99 → deviation
