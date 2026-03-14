@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import UTC, datetime, timedelta
 from typing import cast
+
+from unified_api_contracts import LogLevel
 
 from batch_live_reconciliation_service.orchestrator import run_reconciliation
 
@@ -51,6 +54,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
+    # LOG_LEVEL env var validation (SSOT for log levels)
+    _raw_log_level = os.environ.get("LOG_LEVEL", "INFO")
+    try:
+        _log_level = LogLevel(_raw_log_level)
+    except ValueError:
+        raise SystemExit(
+            f"Invalid LOG_LEVEL={_raw_log_level!r}. Must be one of: {', '.join(v.value for v in LogLevel)}"
+        )
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
