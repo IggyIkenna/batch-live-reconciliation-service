@@ -55,14 +55,12 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
     # LOG_LEVEL env var validation (SSOT for log levels)
-    _raw_log_level = os.environ.get("LOG_LEVEL", "INFO")
+    _raw_log_level = os.environ.get("LOG_LEVEL", "INFO")  # config-bootstrap: before UCC init
     try:
         _log_level = LogLevel(_raw_log_level)
     except ValueError as err:
         valid = ", ".join(v.value for v in LogLevel)
-        raise SystemExit(
-            f"Invalid LOG_LEVEL={_raw_log_level!r}. Must be one of: {valid}"
-        ) from err
+        raise SystemExit(f"Invalid LOG_LEVEL={_raw_log_level!r}. Must be one of: {valid}") from err
 
     parser = _build_parser()
     args = parser.parse_args(argv)
