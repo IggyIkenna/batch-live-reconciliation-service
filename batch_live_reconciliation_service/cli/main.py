@@ -16,7 +16,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from unified_api_contracts import LogLevel
+from unified_trading_library import LogLevel
 
 from batch_live_reconciliation_service.orchestrator import run_reconciliation
 

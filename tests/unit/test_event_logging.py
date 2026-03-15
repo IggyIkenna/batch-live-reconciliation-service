@@ -41,6 +41,7 @@ def _find_python_files(service_dir: Path) -> list[Path]:
                 result.append(Path(root) / f)
     return result
 
+
 def _find_event_markers(file_path: Path) -> set[str]:
     """Extract all log_event marker names from a Python source file.
 
