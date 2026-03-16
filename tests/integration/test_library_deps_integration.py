@@ -81,7 +81,9 @@ class TestUnifiedEventsInterface:
         from unified_events_interface import log_event
 
         log_event("STARTED", details={"date": "2026-03-15", "run_id": "test-run", "dry_run": True})
-        log_event("STOPPED", details={"date": "2026-03-15", "run_id": "test-run", "total_deviations": 0})
+        log_event(
+            "STOPPED", details={"date": "2026-03-15", "run_id": "test-run", "total_deviations": 0}
+        )
         log_event(
             "FAILED",
             details={"date": "2026-03-15", "run_id": "test-run", "failed_stages": "stage0"},
