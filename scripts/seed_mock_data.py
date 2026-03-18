@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Final
 
 from unified_internal_contracts.modes import MockScenario
+from unified_trading_library.core.seed_writer import SeedWriter, get_seed_writer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
@@ -687,20 +688,16 @@ def write_seed_manifest(
     return manifest_path
 
 
-def write_seed_complete_marker(output_root: Path) -> Path:
+def write_seed_complete_marker(writer: SeedWriter) -> str:
     """Write .seed-complete marker file."""
-    marker_path = output_root / ".seed-complete"
-    marker_path.write_text(
-        json.dumps(
-            {
-                "service": SERVICE_NAME,
-                "completed_at": datetime.now(UTC).isoformat(),
-                "layer": LAYER,
-            }
-        )
+    marker_data = json.dumps(
+        {
+            "service": SERVICE_NAME,
+            "completed_at": datetime.now(UTC).isoformat(),
+            "layer": LAYER,
+        }
     )
-    log.info("Marker: %s", marker_path)
-    return marker_path
+    return writer.write_text(marker_data, ".seed-complete")
 
 
 # ---------------------------------------------------------------------------
@@ -771,6 +768,9 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     output_root.mkdir(parents=True, exist_ok=True)
+    # Create seed writer (local filesystem or cloud storage)
+    writer = get_seed_writer(args.env, SERVICE_NAME, args.output_dir)
+    log.info("Writer: %s", type(writer).__name__)
     log.info("Output: %s", output_root)
 
     # Generate data
@@ -789,7 +789,7 @@ def main(argv: list[str] | None = None) -> int:
     write_seed_manifest(
         output_root, written, args.scenario, args.seed, args.date, data
     )
-    write_seed_complete_marker(output_root)
+    write_seed_complete_marker(writer)
 
     # Print summary
     report = data["recon_report"]
