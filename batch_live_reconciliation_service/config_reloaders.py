@@ -13,8 +13,23 @@ logger = logging.getLogger(__name__)
 _instrument_reloader: DomainConfigReloader[InstrumentDomainConfig] | None = None
 _venue_reloader: DomainConfigReloader[VenueDomainConfig] | None = None
 
+_active_instruments: InstrumentDomainConfig | None = None
+_active_venues: VenueDomainConfig | None = None
+
+
+def get_active_instruments() -> InstrumentDomainConfig | None:
+    """Return the latest instruments domain config snapshot, or None if not yet loaded."""
+    return _active_instruments
+
+
+def get_active_venues() -> VenueDomainConfig | None:
+    """Return the latest venues domain config snapshot, or None if not yet loaded."""
+    return _active_venues
+
 
 def _on_instruments_reload(config: InstrumentDomainConfig) -> None:
+    global _active_instruments
+    _active_instruments = config  # Atomic swap -- single assignment
     logger.info(
         "Instruments domain config reloaded: %d instruments, %d venues",
         len(config.subscription_list),
@@ -32,6 +47,8 @@ def _on_instruments_reload(config: InstrumentDomainConfig) -> None:
 
 
 def _on_venues_reload(config: VenueDomainConfig) -> None:
+    global _active_venues
+    _active_venues = config  # Atomic swap -- single assignment
     logger.info(
         "Venues domain config reloaded: %d enabled venues",
         len(config.enabled_venues),
