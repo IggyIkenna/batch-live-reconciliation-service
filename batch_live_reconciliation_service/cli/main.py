@@ -62,6 +62,15 @@ def main(argv: list[str] | None = None) -> int:
         valid = ", ".join(v.value for v in LogLevel)
         raise SystemExit(f"Invalid LOG_LEVEL={_raw_log_level!r}. Must be one of: {valid}") from err
 
+    # --- MOCK MODE: use pre-generated seed data ---
+    from batch_live_reconciliation_service.config import ReconConfig
+
+    if ReconConfig().is_mock_mode():
+        from batch_live_reconciliation_service.engine.mock_data_provider import run_mock_pipeline
+
+        logger.info("MOCK MODE: redirecting to mock pipeline")
+        return run_mock_pipeline()
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
