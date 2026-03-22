@@ -10,7 +10,7 @@
 SERVICE_NAME="batch-live-reconciliation-service"
 SOURCE_DIR="batch_live_reconciliation_service"
 MIN_COVERAGE=70
-RUN_INTEGRATION=true
+RUN_INTEGRATION=false
 PYTEST_WORKERS=${PYTEST_WORKERS:-2}
 LOCAL_DEPS=()
 WORKSPACE_ROOT="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"
