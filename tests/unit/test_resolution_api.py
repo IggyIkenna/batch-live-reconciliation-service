@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import patch
+from unified_internal_contracts import ReconciliationAction, ReconciliationResolution
 
 from batch_live_reconciliation_service.api.resolution_api import (
-    ReconciliationBreakResponse,
-    ResolveResponse,
-    BookCorrectionResponse,
-    BookCorrectionRequest,
     _MOCK_BREAKS,
-    _resolutions,
-    router,
+    BookCorrectionResponse,
 )
-from unified_internal_contracts import ReconciliationAction, ReconciliationResolution
 
 
 class TestListBreaks:
@@ -62,6 +56,7 @@ class TestReconciliationResolution:
 
     def test_note_min_length_enforced(self) -> None:
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError, match="String should have at least 10 characters"):
             ReconciliationResolution(
                 break_id="BRK-001",

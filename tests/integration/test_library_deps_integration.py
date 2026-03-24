@@ -29,7 +29,11 @@ class TestUnifiedConfigInterface:
 
     def test_recon_config_instantiation(self) -> None:
         """ReconConfig extends UnifiedCloudConfig with recon-specific fields."""
+        from unified_config_interface import UnifiedCloudConfig
+
         from batch_live_reconciliation_service.config import ReconConfig
+
+        assert issubclass(ReconConfig, UnifiedCloudConfig)
 
         config = ReconConfig()
         assert isinstance(config.stage_timeout_seconds, int)
@@ -257,18 +261,21 @@ class TestUnifiedTradingLibrary:
     def test_orchestrator_dry_run_full_pipeline(self) -> None:
         """Full orchestrator pipeline completes in dry_run mode."""
         from batch_live_reconciliation_service.config import get_recon_config
+        from batch_live_reconciliation_service.engine.orchestrator import run_reconciliation
         from batch_live_reconciliation_service.models.recon_report import ReconStatus
-        from batch_live_reconciliation_service.orchestrator import run_reconciliation
 
         get_recon_config.cache_clear()
-        report = run_reconciliation(date="2026-03-15", dry_run=True)
+        # Patch _setup_observability so the test-session MockEventSink is preserved
+        # (dry_run skips GCS I/O but setup_events would replace the mock sink with GCSEventSink)
+        with patch("batch_live_reconciliation_service.engine.orchestrator._setup_observability"):
+            report = run_reconciliation(date="2026-03-15", dry_run=True)
 
-        assert report.date == "2026-03-15"
-        assert report.run_id is not None
-        assert len(report.run_id) > 0
-        assert report.started_at is not None
-        assert report.completed_at is not None
-        assert report.status in (ReconStatus.PASSED, ReconStatus.FAILED)
-        # In dry_run, all stages should complete (not crash)
-        assert len(report.stages) >= 1
+            assert report.date == "2026-03-15"
+            assert report.run_id is not None
+            assert len(report.run_id) > 0
+            assert report.started_at is not None
+            assert report.completed_at is not None
+            assert report.status in (ReconStatus.PASSED, ReconStatus.FAILED)
+            # In dry_run, all stages should complete (not crash)
+            assert len(report.stages) >= 1
         get_recon_config.cache_clear()

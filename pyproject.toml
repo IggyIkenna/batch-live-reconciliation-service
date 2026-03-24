@@ -9,30 +9,26 @@ description = "T+1 nightly batch-live reconciliation orchestrator"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "pydantic<3.0.0,>=2.12.5",
-    "unified-config-interface",
-    "unified-cloud-interface",
-    "unified-events-interface",
-    "unified-trading-library",
+    "unified-trading-library>=0.1.0,<1.0.0",
+    "unified-internal-contracts>=0.1.0,<1.0.0",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-socket>=0.7.0,<1.0.0",
+    "pytest-timeout>=2.3.1",
+    "pytest-xdist>=3.6.1",
+    "basedpyright==1.38.2",
 ]
 
 [project.scripts]
 batch-live-reconciliation-service = "batch_live_reconciliation_service.cli.main:main"
 
 
-[tool.uv.sources.unified-config-interface]
-path = "../unified-config-interface"
-editable = true
-
-[tool.uv.sources.unified-cloud-interface]
-path = "../unified-cloud-interface"
-editable = true
-
-[tool.uv.sources.unified-events-interface]
-path = "../unified-events-interface"
-editable = true
-
 [tool.uv.sources.unified-trading-library]
 path = "../unified-trading-library"
+editable = true
+
+[tool.uv.sources.unified-internal-contracts]
+path = "../unified-internal-contracts"
 editable = true
 
 [tool.basedpyright]
@@ -51,13 +47,3 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-socket>=0.7.0,<1.0.0",
-    "pytest-timeout>=2.3.1",
-    "pytest-xdist>=3.6.1",
-    "basedpyright==1.38.2",
-]

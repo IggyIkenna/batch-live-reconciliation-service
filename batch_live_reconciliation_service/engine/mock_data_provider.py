@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os  # noqa: qg-os-env — mock dev infrastructure only; not production config
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 from batch_live_reconciliation_service.models.deviation_thresholds import (
     EXECUTION_THRESHOLDS,
@@ -39,12 +40,7 @@ LAYER: Final[int] = 7
 
 def _get_workspace_root() -> Path:
     """Resolve workspace root from env or heuristics."""
-    import os
-
-    workspace = os.environ.get(
-        "WORKSPACE_ROOT",
-        os.environ.get("UNIFIED_TRADING_WORKSPACE_ROOT", ""),
-    )
+    workspace: str | None = os.environ.get("WORKSPACE_ROOT")  # noqa: qg-os-env
     if workspace:
         return Path(workspace)
     return Path(__file__).resolve().parents[3]
@@ -63,7 +59,10 @@ def _upstream_available() -> bool:
 def _load_json(path: Path) -> list[dict[str, object]] | dict[str, object]:
     """Load JSON from path, return empty list if missing."""
     if path.exists():
-        return json.loads(path.read_text())  # type: ignore[no-any-return]
+        raw: list[dict[str, object]] | dict[str, object] = cast(
+            "list[dict[str, object]]", json.loads(path.read_text())
+        )
+        return raw
     return []
 
 
@@ -77,7 +76,7 @@ def _run_ml_recon(
 
     # In mock mode: simulate a batch-vs-live direction match rate
     total = len(predictions)
-    matching = sum(1 for p in predictions if p.get("confidence", 0) > 0.5)
+    matching = sum(1 for p in predictions if float(str(p.get("confidence") or "0")) > 0.5)
     match_rate = matching / total if total > 0 else 0.0
 
     deviations: list[DeviationRecord] = []
@@ -214,7 +213,7 @@ def run_mock_pipeline() -> int:
     seed_base.mkdir(parents=True, exist_ok=True)
     report_dir = seed_base / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
-    (report_dir / "recon_report.json").write_text(json.dumps(report, indent=2, default=str))
+    _ = (report_dir / "recon_report.json").write_text(json.dumps(report, indent=2, default=str))
 
     marker_data = json.dumps(
         {
@@ -228,6 +227,6 @@ def run_mock_pipeline() -> int:
             "deviation_count": len(all_deviations),
         }
     )
-    marker.write_text(marker_data)
+    _ = marker.write_text(marker_data)
     logger.info("MOCK MODE: %s pipeline complete -- %s", SERVICE_NAME, overall_status)
     return 0

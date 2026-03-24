@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Final
 
 from unified_internal_contracts.modes import MockScenario
-from unified_trading_library.core.seed_writer import SeedWriter, get_seed_writer
+from unified_trading_library import SeedWriter, get_seed_writer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"

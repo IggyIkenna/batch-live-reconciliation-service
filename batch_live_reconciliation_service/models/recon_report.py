@@ -2,6 +2,11 @@
 Pydantic models for reconciliation reports.
 
 No Any types per workspace standards.
+
+# SCHEMA_PROVENANCE_EXEMPT — service-internal pipeline models (CORRECT-LOCAL).
+# ReconReport, StageReport, DeviationRecord are not cross-service contracts;
+# they are the private result types for this service's T+1 pipeline.
+# Cross-service contract (resolution workflow) lives in unified-internal-contracts.
 """
 
 from __future__ import annotations

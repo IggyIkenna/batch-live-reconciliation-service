@@ -4,12 +4,15 @@ Provides endpoints for the UI to:
 1. List reconciliation breaks with filters
 2. Resolve breaks (accept/reject/investigate)
 3. Generate pre-filled manual booking requests for corrections
+
+# SCHEMA_PROVENANCE_EXEMPT — API-layer response/request shapes (CORRECT-LOCAL).
+# ReconciliationBreakResponse, ResolveResponse, BookCorrectionResponse, BookCorrectionRequest
+# are UI-facing API contracts for this service only, not cross-service domain types.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -188,7 +191,9 @@ async def resolve_break(resolution: ReconciliationResolution) -> ResolveResponse
     return ResolveResponse(
         break_id=resolution.break_id,
         action=resolution.action.value,
-        status="resolved" if resolution.action != ReconciliationAction.INVESTIGATE else "investigating",
+        status="resolved"
+        if resolution.action != ReconciliationAction.INVESTIGATE
+        else "investigating",
         message=action_messages.get(resolution.action, "Break resolved"),
     )
 
@@ -213,7 +218,9 @@ async def book_correction(request: BookCorrectionRequest) -> BookCorrectionRespo
         side=side,
         quantity=abs(brk.delta),
         execution_mode="record_only",
-        reason=f"Correction for reconciliation break {request.break_id}: "
-        f"{brk.break_type} delta {brk.delta} on {brk.venue} {brk.instrument_id}",
+        reason=(
+            f"Correction for reconciliation break {request.break_id}: "
+            f"{brk.break_type} delta {brk.delta} on {brk.venue} {brk.instrument_id}"
+        ),
         source_reference=request.break_id,
     )
