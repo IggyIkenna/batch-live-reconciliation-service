@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from unified_events_interface import MockEventSink, setup_events
+from unified_trading_library import MockEventSink, setup_events
 
 # Initialize events for the test session (needed before any log_event calls)
 setup_events(service_name="batch-recon-test", mode="test", sink=MockEventSink())
@@ -29,7 +29,7 @@ class TestUnifiedConfigInterface:
 
     def test_recon_config_instantiation(self) -> None:
         """ReconConfig extends UnifiedCloudConfig with recon-specific fields."""
-        from unified_config_interface import UnifiedCloudConfig
+        from unified_trading_library import UnifiedCloudConfig
 
         from batch_live_reconciliation_service.config import ReconConfig
 
@@ -73,7 +73,7 @@ class TestUnifiedEventsInterface:
 
     def test_log_event_with_stage_details(self) -> None:
         """log_event() accepts stage-specific details used by the orchestrator."""
-        from unified_events_interface import log_event
+        from unified_trading_library import log_event
 
         log_event(
             "PROCESSING_STARTED",
@@ -82,7 +82,7 @@ class TestUnifiedEventsInterface:
 
     def test_log_event_started_stopped(self) -> None:
         """Service uses STARTED/STOPPED/FAILED lifecycle events."""
-        from unified_events_interface import log_event
+        from unified_trading_library import log_event
 
         log_event("STARTED", details={"date": "2026-03-15", "run_id": "test-run", "dry_run": True})
         log_event(
@@ -95,7 +95,7 @@ class TestUnifiedEventsInterface:
 
     def test_setup_events_with_gcs_event_sink_mock(self) -> None:
         """setup_events() can be called with a mock GCSEventSink-like object."""
-        from unified_events_interface import setup_events
+        from unified_trading_library import setup_events
 
         mock_sink = MagicMock()
         # GCSEventSink interface: emit(), flush()
@@ -115,7 +115,7 @@ class TestUnifiedCloudInterface:
 
     def test_get_storage_client_interface(self) -> None:
         """get_storage_client() returns a client with required methods."""
-        from unified_cloud_interface import get_storage_client
+        from unified_trading_library import get_storage_client
 
         client = get_storage_client()
         assert hasattr(client, "upload_bytes")

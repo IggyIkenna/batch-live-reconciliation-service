@@ -16,7 +16,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from unified_events_interface import log_event, setup_events
+from unified_trading_library import log_event, setup_events
 from unified_trading_library import GCSEventSink
 
 from batch_live_reconciliation_service.config import ReconConfig, get_recon_config

@@ -20,8 +20,8 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
-from unified_cloud_interface import get_storage_client
-from unified_events_interface import log_event
+from unified_trading_library import get_storage_client
+from unified_trading_library import log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
 from batch_live_reconciliation_service.models.deviation_thresholds import ML_THRESHOLDS

@@ -16,7 +16,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from unified_events_interface import log_event
+from unified_trading_library import log_event
 from unified_internal_contracts import (
     ReconciliationAction,
     ReconciliationResolution,
