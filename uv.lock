@@ -164,11 +164,11 @@ dependencies = [
 requires-dist = [
     { name = "basedpyright", specifier = "==1.38.2" },
     { name = "pydantic", specifier = ">=2.12.5,<3.0.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "pytest", specifier = ">=9.0.1,<10.0.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0,<8.0.0" },
     { name = "pytest-socket", specifier = ">=0.7.0,<1.0.0" },
-    { name = "pytest-timeout", specifier = ">=2.3.1" },
-    { name = "pytest-xdist", specifier = ">=3.6.1" },
+    { name = "pytest-timeout", specifier = ">=2.4.0,<3.0.0" },
+    { name = "pytest-xdist", specifier = ">=3.6.0,<4.0.0" },
     { name = "unified-internal-contracts", editable = "../unified-internal-contracts" },
     { name = "unified-trading-library", editable = "../unified-trading-library" },
 ]
@@ -2861,7 +2861,7 @@ wheels = [
 
 [[package]]
 name = "unified-api-contracts"
-version = "0.2.38"
+version = "0.1.20"
 source = { editable = "../unified-api-contracts" }
 dependencies = [
     { name = "bandit" },
@@ -2914,7 +2914,7 @@ requires-dist = [
 
 [[package]]
 name = "unified-cloud-interface"
-version = "0.11.39"
+version = "0.11.6"
 source = { editable = "../unified-cloud-interface" }
 dependencies = [
     { name = "bandit" },
@@ -2983,7 +2983,7 @@ requires-dist = [
 
 [[package]]
 name = "unified-config-interface"
-version = "0.2.1"
+version = "0.1.17"
 source = { editable = "../unified-config-interface" }
 dependencies = [
     { name = "bandit" },
@@ -3032,7 +3032,7 @@ requires-dist = [
 
 [[package]]
 name = "unified-events-interface"
-version = "0.2.48"
+version = "0.2.2"
 source = { editable = "../unified-events-interface" }
 dependencies = [
     { name = "bandit" },
@@ -3065,7 +3065,7 @@ requires-dist = [
 
 [[package]]
 name = "unified-internal-contracts"
-version = "0.1.95"
+version = "0.1.2"
 source = { editable = "../unified-internal-contracts" }
 dependencies = [
     { name = "bandit" },
@@ -3114,7 +3114,7 @@ requires-dist = [
 
 [[package]]
 name = "unified-trading-library"
-version = "0.3.191"
+version = "0.3.167"
 source = { editable = "../unified-trading-library" }
 dependencies = [
     { name = "bandit" },
