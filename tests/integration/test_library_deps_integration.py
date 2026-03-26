@@ -19,7 +19,7 @@ setup_events(service_name="batch-recon-test", mode="test", sink=MockEventSink())
 
 
 # ---------------------------------------------------------------------------
-# unified_config_interface
+# unified_trading_library.config_interface
 # ---------------------------------------------------------------------------
 
 
@@ -63,7 +63,7 @@ class TestUnifiedConfigInterface:
 
 
 # ---------------------------------------------------------------------------
-# unified_events_interface
+# unified_trading_library.events_interface
 # ---------------------------------------------------------------------------
 
 
@@ -105,7 +105,7 @@ class TestUnifiedEventsInterface:
 
 
 # ---------------------------------------------------------------------------
-# unified_cloud_interface
+# unified_trading_library.cloud_interface
 # ---------------------------------------------------------------------------
 
 
@@ -219,7 +219,7 @@ class TestUnifiedTradingLibrary:
             assert level.value == level_str
 
     def test_recon_report_model_construction(self) -> None:
-        """ReconReport (uses unified_config_interface indirectly) builds correctly."""
+        """ReconReport (uses unified_trading_library.config_interface indirectly) builds correctly."""
         from batch_live_reconciliation_service.models.recon_report import (
             DeviationRecord,
             ReconReport,
