@@ -11,8 +11,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from unified_trading_library import get_storage_client
-from unified_trading_library import log_event
+from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
 from batch_live_reconciliation_service.models.recon_report import (

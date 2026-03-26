@@ -28,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
-from unified_internal_contracts.modes import MockScenario
+from unified_api_contracts.internal.modes import MockScenario
 from unified_trading_library import SeedWriter, get_seed_writer
 
 logging.basicConfig(

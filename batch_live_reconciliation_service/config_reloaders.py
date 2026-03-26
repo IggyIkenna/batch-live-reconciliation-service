@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 
-from unified_trading_library import InstrumentDomainConfig, VenueDomainConfig
-from unified_trading_library import log_event
-from unified_trading_library import DomainConfigReloader
+from unified_trading_library import (
+    DomainConfigReloader,
+    InstrumentDomainConfig,
+    VenueDomainConfig,
+    log_event,
+)
 
 from batch_live_reconciliation_service.config import ReconConfig
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from unified_internal_contracts import ReconciliationAction, ReconciliationResolution
+from unified_api_contracts.internal import ReconciliationAction, ReconciliationResolution
 
 from batch_live_reconciliation_service.api.resolution_api import (
     _MOCK_BREAKS,
