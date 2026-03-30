@@ -219,7 +219,7 @@ class TestUnifiedTradingLibrary:
             assert level.value == level_str
 
     def test_recon_report_model_construction(self) -> None:
-        """ReconReport (uses unified_trading_library.config_interface indirectly) builds correctly."""
+        """ReconReport (uses UTL config_interface indirectly) builds correctly."""
         from batch_live_reconciliation_service.models.recon_report import (
             DeviationRecord,
             ReconReport,

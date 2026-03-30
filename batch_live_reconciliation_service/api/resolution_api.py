@@ -16,7 +16,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from unified_api_contracts.internal import (
+from unified_api_contracts.internal import (  # noqa: qg-deep-import
     ReconciliationAction,
     ReconciliationResolution,
 )
