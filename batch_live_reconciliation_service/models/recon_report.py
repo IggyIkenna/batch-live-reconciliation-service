@@ -21,6 +21,7 @@ class ReconStage(StrEnum):
     """T+1 reconciliation pipeline stages."""
 
     CONFIG_PULL = "config_pull"
+    DATA_PIPELINE_RECON = "data_pipeline_recon"
     ML_RECON = "ml_recon"
     STRATEGY_RECON = "strategy_recon"
     EXECUTION_RECON = "execution_recon"

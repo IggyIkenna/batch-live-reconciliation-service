@@ -1,13 +1,14 @@
 """
 T+1 Batch-Live Reconciliation Orchestrator.
 
-Runs the 5-stage pipeline sequentially:
-  Stage 0 — Config + Data Availability Check
-  Stage 1 — ML Reconciliation
-  Stage 2 — Strategy Reconciliation
-  Stage 3 — Execution Reconciliation
-  Stage 4 — Agent Analysis
-  Stage 5 — Consolidated Results Writer
+Runs the 6-stage pipeline sequentially:
+  Stage 0   — Config + Data Availability Check
+  Stage 0.5 — Data Pipeline Reconciliation (instruments, MTDS, MDPS)
+  Stage 1   — ML Reconciliation
+  Stage 2   — Strategy Reconciliation
+  Stage 3   — Execution Reconciliation
+  Stage 4   — Agent Analysis
+  Stage 5   — Consolidated Results Writer
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ from batch_live_reconciliation_service.models.recon_report import (
     ReconStatus,
 )
 from batch_live_reconciliation_service.stages.stage0_config_pull import run_stage0
+from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+    run_data_pipeline_recon,
+)
 from batch_live_reconciliation_service.stages.stage1_ml_recon import run_stage1
 from batch_live_reconciliation_service.stages.stage2_strategy_recon import run_stage2
 from batch_live_reconciliation_service.stages.stage3_execution_recon import run_stage3
@@ -83,6 +87,10 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
         log_event("FAILED", details={"date": date, "stage": "stage0", "reason": s0.error_message})
         return report
 
+    # Stage 0.5: Data pipeline reconciliation (instruments, MTDS, MDPS)
+    s0_data = run_data_pipeline_recon(config, date, dry_run=dry_run)
+    report.stages.append(s0_data)
+
     # Stage 1: ML reconciliation
     s1 = run_stage1(config, date, dry_run=dry_run)
     report.stages.append(s1)
@@ -95,8 +103,8 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
     s3 = run_stage3(config, date, dry_run=dry_run)
     report.stages.append(s3)
 
-    # Stage 4: Agent analysis (uses results from stages 1-3)
-    s4 = run_stage4(config, date, stage_reports=[s1, s2, s3], dry_run=dry_run)
+    # Stage 4: Agent analysis (uses results from data pipeline + stages 1-3)
+    s4 = run_stage4(config, date, stage_reports=[s0_data, s1, s2, s3], dry_run=dry_run)
     report.stages.append(s4)
     if s4.output_gcs_path:
         report.agent_report_gcs_path = s4.output_gcs_path

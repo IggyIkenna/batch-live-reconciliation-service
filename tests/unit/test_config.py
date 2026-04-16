@@ -14,7 +14,7 @@ def test_config_bucket_derivation() -> None:
         config = ReconConfig()
         assert config.recon_bucket == "recon-my-project"
         assert config.events_bucket == "my-project-events"
-        assert config.execution_store_bucket == "execution-store-my-project"
+        assert config.execution_store_bucket == "execution-store-cefi-my-project"
 
 
 def test_config_dry_run_default() -> None:

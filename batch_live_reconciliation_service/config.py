@@ -24,6 +24,14 @@ class ReconConfig(UnifiedCloudConfig):
     # GCS bucket for execution config snapshots
     execution_store_bucket: str = ""
 
+    # GCS buckets for data pipeline reconciliation (per-category)
+    instruments_bucket_cefi: str = ""
+    instruments_bucket_tradfi: str = ""
+    instruments_bucket_defi: str = ""
+    market_data_tick_bucket_cefi: str = ""
+    market_data_tick_bucket_tradfi: str = ""
+    market_data_tick_bucket_defi: str = ""
+
     # Cloud Run Job timeout per stage (seconds)
     stage_timeout_seconds: int = 1800  # 30 minutes
 
@@ -39,7 +47,20 @@ class ReconConfig(UnifiedCloudConfig):
         if not self.events_bucket:
             self.events_bucket = f"{project_id}-events"
         if not self.execution_store_bucket:
-            self.execution_store_bucket = f"execution-store-{project_id}"
+            self.execution_store_bucket = f"execution-store-cefi-{project_id}"
+        # Data pipeline buckets — follow UTL BUCKET_PREFIXES convention
+        if not self.instruments_bucket_cefi:
+            self.instruments_bucket_cefi = f"instruments-store-cefi-{project_id}"
+        if not self.instruments_bucket_tradfi:
+            self.instruments_bucket_tradfi = f"instruments-store-tradfi-{project_id}"
+        if not self.instruments_bucket_defi:
+            self.instruments_bucket_defi = f"instruments-store-defi-{project_id}"
+        if not self.market_data_tick_bucket_cefi:
+            self.market_data_tick_bucket_cefi = f"market-data-tick-cefi-{project_id}"
+        if not self.market_data_tick_bucket_tradfi:
+            self.market_data_tick_bucket_tradfi = f"market-data-tick-tradfi-{project_id}"
+        if not self.market_data_tick_bucket_defi:
+            self.market_data_tick_bucket_defi = f"market-data-tick-defi-{project_id}"
 
 
 @lru_cache(maxsize=1)

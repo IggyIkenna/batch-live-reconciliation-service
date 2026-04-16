@@ -40,6 +40,16 @@ class ExecutionThresholds:
     order_latency_p99_ms_max: float = 600.0  # > 600ms (500ms gate + 100ms tolerance) → alert
 
 
+@dataclass(frozen=True)
+class DataPipelineThresholds:
+    """Stage 0.5: Data pipeline reconciliation alert thresholds."""
+
+    file_count_match_rate_min: float = 0.95  # < 95% file count match → alert
+    row_count_match_rate_min: float = 0.95  # < 95% row count match → alert
+    missing_live_partition_max: int = 0  # > 0 services with no live partition → alert
+
+
 ML_THRESHOLDS = MLThresholds()
 STRATEGY_THRESHOLDS = StrategyThresholds()
 EXECUTION_THRESHOLDS = ExecutionThresholds()
+DATA_PIPELINE_THRESHOLDS = DataPipelineThresholds()
