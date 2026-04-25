@@ -1,3 +1,5 @@
+# SCHEMA_PROVENANCE_EXEMPT: _BlobStats and _ServiceReconResult are private stage-internal
+# result containers — not cross-repo contracts.
 """
 Stage 0.5 — Data Pipeline Reconciliation.
 
@@ -163,9 +165,7 @@ def _count_parquet_rows(raw_bytes: bytes) -> int:
     return pf.metadata.num_rows
 
 
-def _get_bucket_for_service(
-    config: ReconConfig, bucket_attr_prefix: str, category: str
-) -> str:
+def _get_bucket_for_service(config: ReconConfig, bucket_attr_prefix: str, category: str) -> str:
     """Get the bucket name from config for a given service prefix and category."""
     attr_name = f"{bucket_attr_prefix}_{category}"
     bucket_val: str = getattr(config, attr_name, "")
@@ -277,9 +277,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
             )
 
     # Check for services with no live partition at all
-    missing_live = [
-        r for r in results if r.batch_files > 0 and not r.has_live_partition
-    ]
+    missing_live = [r for r in results if r.batch_files > 0 and not r.has_live_partition]
     if len(missing_live) > t.missing_live_partition_max:
         missing_names = [f"{r.service_name}/{r.category}" for r in missing_live]
         deviations.append(
@@ -299,9 +297,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
     return deviations
 
 
-def run_data_pipeline_recon(
-    config: ReconConfig, date: str, dry_run: bool = False
-) -> StageReport:
+def run_data_pipeline_recon(config: ReconConfig, date: str, dry_run: bool = False) -> StageReport:
     """
     Run data pipeline reconciliation: compare batch vs live for
     instruments-service, market-tick-data-service, and market-data-processing-service.
@@ -394,9 +390,7 @@ def run_data_pipeline_recon(
     status = ReconStatus.PASSED if not deviations else ReconStatus.FAILED
 
     if deviations:
-        logger.warning(
-            "[Data Pipeline Recon] %d deviation(s) detected", len(deviations)
-        )
+        logger.warning("[Data Pipeline Recon] %d deviation(s) detected", len(deviations))
         for d in deviations:
             logger.warning("  - %s: %s", d.metric_name, d.description)
     else:

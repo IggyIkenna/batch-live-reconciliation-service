@@ -139,6 +139,123 @@ class TestStage0ConfigPull:
 
 
 # ---------------------------------------------------------------------------
+# Stage 0.5: Data Pipeline Recon
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def data_pipeline_config() -> MagicMock:
+    """Mock ReconConfig with per-service/per-category bucket attrs populated."""
+    cfg = MagicMock()
+    cfg.gcp_project_id = "mock-project"
+    cfg.stage_timeout_seconds = 30
+    cfg.config_store_bucket = ""
+    for cat in ("cefi", "tradfi", "defi"):
+        setattr(cfg, f"instruments_bucket_{cat}", f"instruments-{cat}")
+        setattr(cfg, f"market_data_tick_bucket_{cat}", f"mtd-{cat}")
+    return cfg
+
+
+class _FakeBlob:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class TestStage0DataPipelineRecon:
+    def test_dry_run_returns_passed(self, data_pipeline_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=True)
+
+        assert result.stage == ReconStage.DATA_PIPELINE_RECON
+        assert result.status == ReconStatus.PASSED
+        assert result.metrics.get("dry_run") == 1.0
+
+    def test_matching_batch_live_returns_passed(self, data_pipeline_config: MagicMock) -> None:
+        """Equal batch and live file counts produce no deviations → PASSED."""
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        # Same file list for batch and live prefix → files_match=True, has_live_partition=True
+        fake_blobs = [_FakeBlob("2026-03-15/venue/spot/a.csv")]
+        mock_client = MagicMock()
+        mock_client.bucket.return_value.list_blobs.return_value = fake_blobs
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=mock_client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        assert result.status == ReconStatus.PASSED
+        assert result.metrics["services_checked"] == 9.0  # 3 services × 3 categories
+
+    def test_missing_live_partition_flags_deviation(self, data_pipeline_config: MagicMock) -> None:
+        """Batch files exist but live prefix empty → missing_live_partitions deviation."""
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        def _list_blobs(prefix: str = "", **_: object) -> list[_FakeBlob]:
+            if prefix.startswith("live/") or "live/" in prefix:
+                return []
+            return [_FakeBlob(f"{prefix}a.csv"), _FakeBlob(f"{prefix}b.csv")]
+
+        mock_bucket = MagicMock()
+        mock_bucket.list_blobs.side_effect = _list_blobs
+        mock_client = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=mock_client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        assert result.status == ReconStatus.FAILED
+        dev_names = {d.metric_name for d in result.deviations}
+        # Either file_count_match_rate or missing_live_partitions should fire
+        assert dev_names & {"file_count_match_rate", "missing_live_partitions"}
+
+    def test_gcs_listing_error_recorded_per_service(self, data_pipeline_config: MagicMock) -> None:
+        """_count_blobs_and_rows catches listing errors → error populated on result."""
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        mock_client = MagicMock()
+        mock_client.bucket.return_value.list_blobs.side_effect = RuntimeError("GCS listing failed")
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=mock_client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        # All services should have captured errors but the pipeline still completes.
+        assert result.metrics["services_with_errors"] > 0
+
+    def test_missing_bucket_config_captured_in_error(self) -> None:
+        """If config returns empty bucket name → result.error is populated."""
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        cfg = MagicMock()
+        cfg.gcp_project_id = "mock-project"
+        # Deliberately leave all bucket attributes empty so every service/category
+        # hits the "no bucket configured" branch.
+        for cat in ("cefi", "tradfi", "defi"):
+            setattr(cfg, f"instruments_bucket_{cat}", "")
+            setattr(cfg, f"market_data_tick_bucket_{cat}", "")
+
+        result = run_data_pipeline_recon(cfg, "2026-03-15", dry_run=False)
+
+        assert result.metrics["services_with_errors"] == result.metrics["services_checked"]
+
+
+# ---------------------------------------------------------------------------
 # Stage 1: ML Recon
 # ---------------------------------------------------------------------------
 
@@ -350,6 +467,86 @@ class TestStage5ResultsWriter:
             result = _load_index("mock-bucket")
 
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
+
+
+class TestReconciliationOrchestrator:
+    def _make_passed_stage_report(self, stage: ReconStage) -> StageReport:
+        return StageReport(
+            stage=stage,
+            status=ReconStatus.PASSED,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            metrics={"dry_run": 1.0},
+        )
+
+    def test_run_reconciliation_dry_run_happy_path(self) -> None:
+        from batch_live_reconciliation_service.engine import orchestrator as orch
+
+        fake_config = MagicMock()
+        fake_config.gcp_project_id = "p"
+        fake_config.events_bucket = "e"
+
+        s_reports = {
+            "stage0": self._make_passed_stage_report(ReconStage.CONFIG_PULL),
+            "stage0_data": self._make_passed_stage_report(ReconStage.DATA_PIPELINE_RECON),
+            "stage1": self._make_passed_stage_report(ReconStage.ML_RECON),
+            "stage2": self._make_passed_stage_report(ReconStage.STRATEGY_RECON),
+            "stage3": self._make_passed_stage_report(ReconStage.EXECUTION_RECON),
+            "stage4": self._make_passed_stage_report(ReconStage.AGENT_ANALYSIS),
+            "stage5": self._make_passed_stage_report(ReconStage.RESULTS_WRITER),
+        }
+
+        with (
+            patch.object(orch, "get_recon_config", return_value=fake_config),
+            patch.object(orch, "_setup_observability"),
+            patch.object(orch, "run_stage0", return_value=s_reports["stage0"]),
+            patch.object(orch, "run_data_pipeline_recon", return_value=s_reports["stage0_data"]),
+            patch.object(orch, "run_stage1", return_value=s_reports["stage1"]),
+            patch.object(orch, "run_stage2", return_value=s_reports["stage2"]),
+            patch.object(orch, "run_stage3", return_value=s_reports["stage3"]),
+            patch.object(orch, "run_stage4", return_value=s_reports["stage4"]),
+            patch.object(orch, "run_stage5", return_value=s_reports["stage5"]),
+            patch.object(orch, "log_event"),
+        ):
+            report = orch.run_reconciliation("2026-03-15", dry_run=True)
+
+        assert report.status == ReconStatus.PASSED
+        assert report.date == "2026-03-15"
+        # All 7 stages appended (Stage 0 + 0.5 + 1-5)
+        assert len(report.stages) == 7
+
+    def test_run_reconciliation_stage0_fail_aborts(self) -> None:
+        from batch_live_reconciliation_service.engine import orchestrator as orch
+
+        fake_config = MagicMock()
+        fake_config.gcp_project_id = "p"
+        fake_config.events_bucket = "e"
+
+        failed_stage0 = StageReport(
+            stage=ReconStage.CONFIG_PULL,
+            status=ReconStatus.FAILED,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            error_message="config missing",
+        )
+
+        with (
+            patch.object(orch, "get_recon_config", return_value=fake_config),
+            patch.object(orch, "_setup_observability"),
+            patch.object(orch, "run_stage0", return_value=failed_stage0),
+            patch.object(orch, "run_data_pipeline_recon") as m_data,
+            patch.object(orch, "log_event"),
+        ):
+            report = orch.run_reconciliation("2026-03-15", dry_run=True)
+
+        assert report.status == ReconStatus.FAILED
+        assert len(report.stages) == 1  # pipeline aborts after Stage 0
+        m_data.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
