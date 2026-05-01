@@ -60,7 +60,7 @@ def main() -> None:
         description=(
             "T+1 Batch-Live Reconciliation -- nightly pipeline replay and deviation analysis"
         ),
-        add_category_arg=False,
+        add_asset_group_arg=False,
         extra_args_fn=_add_recon_args,
         mock_pipeline_fn=_get_mock_pipeline,
     ).run()
