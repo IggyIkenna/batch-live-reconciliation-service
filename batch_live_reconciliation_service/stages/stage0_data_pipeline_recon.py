@@ -88,7 +88,13 @@ _DATA_PIPELINE_SERVICES: list[tuple[str, str, str, str]] = [
     ),
 ]
 
-_CATEGORIES = ("cefi", "tradfi", "defi")
+# Asset-group keys (lowercase wire-format SSOT per workspace CLAUDE.md;
+# GCS path segments use these literally as ``category=cefi/...``).
+# Extended 2026-05-01 (Wave E) to cover sports + prediction. If those
+# pipelines have not yet written batch/live archives the reconciliation
+# is harmless: the prefix probe returns 0 files and surfaces as a missing
+# bucket instead of being silently skipped.
+_CATEGORIES = ("cefi", "tradfi", "defi", "sports", "prediction")
 
 
 @dataclass

@@ -16,6 +16,10 @@ LOCAL_DEPS=()
 # stage0_data_pipeline_recon lazy-imports pyarrow.parquet inside _count_parquet_rows
 # to avoid pulling the heavy pyarrow dep at module import (only needed for recon).
 IMPORT_INSIDE_EXCLUDE_GLOBS=("!**/stages/stage0_data_pipeline_recon.py")
+# Pre-existing cryptography CVEs upstream; tracked workspace-wide via the
+# alerting-service / shared CVE ignore list. Drop when cryptography>=46.0.7
+# lands in unified-trading-library's pinned dep tree.
+PIP_AUDIT_EXTRA_ARGS="--ignore-vuln CVE-2026-34073 --ignore-vuln CVE-2026-39892"
 WORKSPACE_ROOT="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"
 source "${WORKSPACE_ROOT}/unified-trading-pm/scripts/quality-gates-base/base-service.sh"
 

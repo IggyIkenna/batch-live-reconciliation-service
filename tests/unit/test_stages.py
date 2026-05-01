@@ -190,7 +190,8 @@ class TestStage0DataPipelineRecon:
             result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
 
         assert result.status == ReconStatus.PASSED
-        assert result.metrics["services_checked"] == 9.0  # 3 services × 3 categories
+        # 3 services x 5 categories (sports + prediction added in Wave E).
+        assert result.metrics["services_checked"] == 15.0
 
     def test_missing_live_partition_flags_deviation(self, data_pipeline_config: MagicMock) -> None:
         """Batch files exist but live prefix empty → missing_live_partitions deviation."""
