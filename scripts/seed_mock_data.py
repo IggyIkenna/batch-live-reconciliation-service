@@ -31,9 +31,7 @@ from typing import Final
 from unified_api_contracts.internal.modes import MockScenario
 from unified_trading_library import SeedWriter, get_seed_writer
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -189,8 +187,7 @@ def _generate_strategy_events(
         batch_instruction: dict[str, object] = {
             **live_instruction,
             "quantity": round(
-                float(str(live_instruction["quantity"]))
-                + (rng.random() - 0.5) * 0.5,
+                float(str(live_instruction["quantity"])) + (rng.random() - 0.5) * 0.5,
                 4,
             ),
         }
@@ -215,9 +212,7 @@ def _generate_strategy_events(
             "event_type": "POSITION_SNAPSHOT",
             "instrument_id": instrument,
             "net_position": batch_pos,
-            "unrealized_pnl": round(
-                batch_pos * (rng.random() - 0.3) * 100, 2
-            ),
+            "unrealized_pnl": round(batch_pos * (rng.random() - 0.3) * 100, 2),
             "timestamp": f"{date_str}T16:00:00+00:00",
         }
         batch_events.append(batch_snapshot)
@@ -304,17 +299,13 @@ def _generate_execution_events(
                 "event_type": "FILL",
                 "order_id": order_id,
                 "instrument_id": instrument,
-                "fill_price": round(
-                    fill_price * (1 + (rng.random() - 0.5) * 0.002), 2
-                ),
+                "fill_price": round(fill_price * (1 + (rng.random() - 0.5) * 0.002), 2),
                 "filled_qty": filled_qty,
                 "slippage_bps": round(
                     slippage_base + (rng.random() - 0.5) * slippage_noise,
                     2,
                 ),
-                "latency_ms": round(
-                    latency_base + (rng.random() - 0.5) * 100, 1
-                ),
+                "latency_ms": round(latency_base + (rng.random() - 0.5) * 100, 1),
                 "timestamp": (ts + timedelta(seconds=rng.randint(1, 30))).isoformat(),
             }
             batch_events.append(batch_fill)
@@ -351,43 +342,46 @@ def _build_recon_report(
 
     ml_deviations: list[dict[str, object]] = []
     if ml_direction_match < 0.95:
-        ml_deviations.append({
-            "metric_name": "signal_direction_match_rate",
-            "stage": "ml_recon",
-            "actual_value": ml_direction_match,
-            "threshold": 0.95,
-            "direction": "below",
-            "description": (
-                f"Signal direction match rate {ml_direction_match:.1%}"
-                " < 95% threshold"
-            ),
-        })
+        ml_deviations.append(
+            {
+                "metric_name": "signal_direction_match_rate",
+                "stage": "ml_recon",
+                "actual_value": ml_direction_match,
+                "threshold": 0.95,
+                "direction": "below",
+                "description": (
+                    f"Signal direction match rate {ml_direction_match:.1%} < 95% threshold"
+                ),
+            }
+        )
     if ml_mae > 0.1:
-        ml_deviations.append({
-            "metric_name": "signal_magnitude_mae",
-            "stage": "ml_recon",
-            "actual_value": ml_mae,
-            "threshold": 0.1,
-            "direction": "above",
-            "description": (
-                f"Signal magnitude MAE {ml_mae:.3f} > 0.1 threshold"
-            ),
-        })
+        ml_deviations.append(
+            {
+                "metric_name": "signal_magnitude_mae",
+                "stage": "ml_recon",
+                "actual_value": ml_mae,
+                "threshold": 0.1,
+                "direction": "above",
+                "description": (f"Signal magnitude MAE {ml_mae:.3f} > 0.1 threshold"),
+            }
+        )
 
-    stages.append({
-        "stage": "ml_recon",
-        "status": "failed" if ml_deviations else "passed",
-        "started_at": started_at.isoformat(),
-        "completed_at": (started_at + timedelta(minutes=5)).isoformat(),
-        "deviations": ml_deviations,
-        "metrics": {
-            "signal_direction_match_rate": ml_direction_match,
-            "signal_magnitude_mae": ml_mae,
-            "instrument_coverage_pct": round(ml_coverage, 4),
-            "batch_event_count": float(len(ml_batch)),
-            "live_event_count": float(len(ml_live)),
-        },
-    })
+    stages.append(
+        {
+            "stage": "ml_recon",
+            "status": "failed" if ml_deviations else "passed",
+            "started_at": started_at.isoformat(),
+            "completed_at": (started_at + timedelta(minutes=5)).isoformat(),
+            "deviations": ml_deviations,
+            "metrics": {
+                "signal_direction_match_rate": ml_direction_match,
+                "signal_magnitude_mae": ml_mae,
+                "instrument_coverage_pct": round(ml_coverage, 4),
+                "batch_event_count": float(len(ml_batch)),
+                "live_event_count": float(len(ml_live)),
+            },
+        }
+    )
 
     # Stage 2: Strategy Recon summary
     strat_alignment = round(0.80 + rng.random() * 0.20, 4)
@@ -397,44 +391,45 @@ def _build_recon_report(
 
     strat_deviations: list[dict[str, object]] = []
     if strat_alignment < 0.85:
-        strat_deviations.append({
-            "metric_name": "instruction_alignment_pct",
-            "stage": "strategy_recon",
-            "actual_value": strat_alignment,
-            "threshold": 0.85,
-            "direction": "below",
-            "description": (
-                f"Instruction alignment {strat_alignment:.1%} < 85%"
-            ),
-        })
+        strat_deviations.append(
+            {
+                "metric_name": "instruction_alignment_pct",
+                "stage": "strategy_recon",
+                "actual_value": strat_alignment,
+                "threshold": 0.85,
+                "direction": "below",
+                "description": (f"Instruction alignment {strat_alignment:.1%} < 85%"),
+            }
+        )
     if pnl_delta > 0.02:
-        strat_deviations.append({
-            "metric_name": "benchmark_pnl_delta",
-            "stage": "strategy_recon",
-            "actual_value": pnl_delta,
-            "threshold": 0.02,
-            "direction": "above",
-            "description": (
-                f"Benchmark P&L delta {pnl_delta:.1%}"
-                " > 2% of notional"
-            ),
-        })
+        strat_deviations.append(
+            {
+                "metric_name": "benchmark_pnl_delta",
+                "stage": "strategy_recon",
+                "actual_value": pnl_delta,
+                "threshold": 0.02,
+                "direction": "above",
+                "description": (f"Benchmark P&L delta {pnl_delta:.1%} > 2% of notional"),
+            }
+        )
 
-    stages.append({
-        "stage": "strategy_recon",
-        "status": "failed" if strat_deviations else "passed",
-        "started_at": (started_at + timedelta(minutes=5)).isoformat(),
-        "completed_at": (started_at + timedelta(minutes=12)).isoformat(),
-        "deviations": strat_deviations,
-        "metrics": {
-            "instruction_alignment_pct": strat_alignment,
-            "benchmark_pnl_delta": pnl_delta,
-            "position_snapshot_delta": pos_delta,
-            "var_delta_pct": var_delta,
-            "batch_event_count": float(len(strategy_batch)),
-            "live_event_count": float(len(strategy_live)),
-        },
-    })
+    stages.append(
+        {
+            "stage": "strategy_recon",
+            "status": "failed" if strat_deviations else "passed",
+            "started_at": (started_at + timedelta(minutes=5)).isoformat(),
+            "completed_at": (started_at + timedelta(minutes=12)).isoformat(),
+            "deviations": strat_deviations,
+            "metrics": {
+                "instruction_alignment_pct": strat_alignment,
+                "benchmark_pnl_delta": pnl_delta,
+                "position_snapshot_delta": pos_delta,
+                "var_delta_pct": var_delta,
+                "batch_event_count": float(len(strategy_batch)),
+                "live_event_count": float(len(strategy_live)),
+            },
+        }
+    )
 
     # Stage 3: Execution Recon summary
     alpha_gap = round(rng.random() * 0.02, 4)
@@ -445,44 +440,46 @@ def _build_recon_report(
 
     exec_deviations: list[dict[str, object]] = []
     if alpha_gap > 0.01:
-        exec_deviations.append({
-            "metric_name": "alpha_pnl_gap",
-            "stage": "execution_recon",
-            "actual_value": alpha_gap,
-            "threshold": 0.01,
-            "direction": "above",
-            "description": (
-                f"Alpha P&L gap {alpha_gap:.1%} > 1% of notional"
-            ),
-        })
+        exec_deviations.append(
+            {
+                "metric_name": "alpha_pnl_gap",
+                "stage": "execution_recon",
+                "actual_value": alpha_gap,
+                "threshold": 0.01,
+                "direction": "above",
+                "description": (f"Alpha P&L gap {alpha_gap:.1%} > 1% of notional"),
+            }
+        )
     if slippage_delta > 10.0:
-        exec_deviations.append({
-            "metric_name": "slippage_delta_bps",
-            "stage": "execution_recon",
-            "actual_value": slippage_delta,
-            "threshold": 10.0,
-            "direction": "above",
-            "description": (
-                f"Slippage delta {slippage_delta:.1f}bps > 10bps"
-            ),
-        })
+        exec_deviations.append(
+            {
+                "metric_name": "slippage_delta_bps",
+                "stage": "execution_recon",
+                "actual_value": slippage_delta,
+                "threshold": 10.0,
+                "direction": "above",
+                "description": (f"Slippage delta {slippage_delta:.1f}bps > 10bps"),
+            }
+        )
 
-    stages.append({
-        "stage": "execution_recon",
-        "status": "failed" if exec_deviations else "passed",
-        "started_at": (started_at + timedelta(minutes=12)).isoformat(),
-        "completed_at": (started_at + timedelta(minutes=18)).isoformat(),
-        "deviations": exec_deviations,
-        "metrics": {
-            "alpha_pnl_gap": alpha_gap,
-            "fill_rate_delta": fill_rate_delta,
-            "slippage_delta_bps": slippage_delta,
-            "algo_selection_accuracy": algo_accuracy,
-            "order_latency_p99_ms": p99_latency,
-            "batch_fill_count": float(len(execution_batch)),
-            "live_fill_count": float(len(execution_live)),
-        },
-    })
+    stages.append(
+        {
+            "stage": "execution_recon",
+            "status": "failed" if exec_deviations else "passed",
+            "started_at": (started_at + timedelta(minutes=12)).isoformat(),
+            "completed_at": (started_at + timedelta(minutes=18)).isoformat(),
+            "deviations": exec_deviations,
+            "metrics": {
+                "alpha_pnl_gap": alpha_gap,
+                "fill_rate_delta": fill_rate_delta,
+                "slippage_delta_bps": slippage_delta,
+                "algo_selection_accuracy": algo_accuracy,
+                "order_latency_p99_ms": p99_latency,
+                "batch_fill_count": float(len(execution_batch)),
+                "live_fill_count": float(len(execution_live)),
+            },
+        }
+    )
 
     all_deviations: list[dict[str, object]] = []
     for stage in stages:
@@ -490,9 +487,7 @@ def _build_recon_report(
         if isinstance(stage_devs, list):
             all_deviations.extend(stage_devs)
 
-    failed_stages = [
-        str(s["stage"]) for s in stages if s.get("status") == "failed"
-    ]
+    failed_stages = [str(s["stage"]) for s in stages if s.get("status") == "failed"]
     overall_status = "failed" if failed_stages else "passed"
 
     return {
@@ -528,9 +523,7 @@ def generate_recon_data(
         {"ml_events": 50, "strategy_events": 30, "execution_events": 40},
     )
 
-    ml_batch, ml_live = _generate_ml_events(
-        counts["ml_events"], rng, date_str, scenario
-    )
+    ml_batch, ml_live = _generate_ml_events(counts["ml_events"], rng, date_str, scenario)
     strat_batch, strat_live = _generate_strategy_events(
         counts["strategy_events"], rng, date_str, scenario
     )
@@ -760,12 +753,7 @@ def main(argv: list[str] | None = None) -> int:
         script_dir = Path(__file__).resolve().parent
         repo_root = script_dir.parent
         workspace_root = repo_root.parent
-        output_root = (
-            workspace_root
-            / ".local-dev-cache"
-            / "mock-seed"
-            / SERVICE_NAME
-        )
+        output_root = workspace_root / ".local-dev-cache" / "mock-seed" / SERVICE_NAME
 
     output_root.mkdir(parents=True, exist_ok=True)
     # Create seed writer (local filesystem or cloud storage)
@@ -786,9 +774,7 @@ def main(argv: list[str] | None = None) -> int:
     written.append(write_recon_report(data, output_root))
 
     # Write manifest and marker
-    write_seed_manifest(
-        output_root, written, args.scenario, args.seed, args.date, data
-    )
+    write_seed_manifest(output_root, written, args.scenario, args.seed, args.date, data)
     write_seed_complete_marker(writer)
 
     # Print summary
