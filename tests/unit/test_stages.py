@@ -391,6 +391,257 @@ class TestStage3ExecutionRecon:
 
 
 # ---------------------------------------------------------------------------
+# Stage 3b: Paper-vs-live Recon (pvl-p21a)
+# ---------------------------------------------------------------------------
+
+
+class TestStage3bPaperLiveRecon:
+    def test_dry_run_returns_passed(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import run_stage3b
+
+        result = run_stage3b(mock_config, "2026-05-15", dry_run=True)
+
+        assert result.stage == ReconStage.PAPER_LIVE_RECON
+        assert result.status == ReconStatus.PASSED
+
+    def test_empty_events_returns_passed(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import run_stage3b
+
+        mock_client = MagicMock()
+        mock_client.bucket.return_value.list_blobs.return_value = []
+        with patch(
+            "batch_live_reconciliation_service.stages.stage3b_paper_live_recon.get_storage_client",
+            return_value=mock_client,
+        ):
+            result = run_stage3b(mock_config, "2026-05-15", dry_run=False)
+
+        assert result.status == ReconStatus.PASSED
+
+    def test_within_threshold_returns_passed(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            PaperLiveThresholds,
+        )
+        from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        paper = [
+            {
+                "realized_pnl": 100.0,
+                "fill_rate": 0.95,
+                "slippage_bps": 2.0,
+                "order_latency_ms": 200.0,
+                "algo_correct": 1.0,
+            }
+        ]
+        live = [
+            {
+                "realized_pnl": 100.4,
+                "fill_rate": 0.95,
+                "slippage_bps": 2.0,
+                "order_latency_ms": 200.0,
+                "algo_correct": 1.0,
+            }
+        ]
+        metrics = _compute_metrics(paper, live)
+        deviations = _check_deviations(metrics, PaperLiveThresholds())
+
+        assert len(deviations) == 0
+
+    def test_pnl_gap_breach_detected_with_auto_demote_routing(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            PaperLiveThresholds,
+        )
+        from batch_live_reconciliation_service.models.recon_report import FailureRoutingAction
+        from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        paper = [
+            {
+                "realized_pnl": 100.0,
+                "fill_rate": 0.95,
+                "slippage_bps": 2.0,
+                "order_latency_ms": 200.0,
+            }
+        ]
+        live = [
+            {
+                "realized_pnl": 200.0,
+                "fill_rate": 0.95,
+                "slippage_bps": 2.0,
+                "order_latency_ms": 200.0,
+            }
+        ]
+        metrics = _compute_metrics(paper, live)
+        deviations = _check_deviations(metrics, PaperLiveThresholds())
+
+        alpha_devs = [d for d in deviations if d.record.metric_name == "alpha_pnl_gap"]
+        assert len(alpha_devs) == 1
+        assert alpha_devs[0].routing_action == FailureRoutingAction.AUTO_DEMOTE_TO_PAPER
+
+    def test_latency_breach_routing_is_alert_only(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            PaperLiveThresholds,
+        )
+        from batch_live_reconciliation_service.models.recon_report import FailureRoutingAction
+        from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        paper = [
+            {
+                "realized_pnl": 100.0,
+                "fill_rate": 0.95,
+                "slippage_bps": 2.0,
+                "order_latency_ms": 600.0,
+            }
+        ]
+        live = [
+            {
+                "realized_pnl": 100.0,
+                "fill_rate": 0.95,
+                "slippage_bps": 2.0,
+                "order_latency_ms": 200.0,
+            }
+        ]
+        metrics = _compute_metrics(paper, live)
+        deviations = _check_deviations(metrics, PaperLiveThresholds())
+
+        lat_devs = [d for d in deviations if d.record.metric_name == "order_latency_p99_ms"]
+        assert len(lat_devs) == 1
+        assert lat_devs[0].routing_action == FailureRoutingAction.ALERT
+
+    def test_stage_report_stage_is_paper_live_recon(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import run_stage3b
+
+        result = run_stage3b(mock_config, "2026-05-15", dry_run=True)
+        assert result.stage == ReconStage.PAPER_LIVE_RECON
+
+
+# ---------------------------------------------------------------------------
+# Stage 3c: Batch-vs-paper Recon (pvl-p21a)
+# ---------------------------------------------------------------------------
+
+
+class TestStage3cBatchPaperRecon:
+    def test_dry_run_returns_passed(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage3c_batch_paper_recon import run_stage3c
+
+        result = run_stage3c(mock_config, "2026-05-15", dry_run=True)
+
+        assert result.stage == ReconStage.BATCH_PAPER_RECON
+        assert result.status == ReconStatus.PASSED
+
+    def test_empty_events_returns_passed(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage3c_batch_paper_recon import run_stage3c
+
+        mock_client = MagicMock()
+        mock_client.bucket.return_value.list_blobs.return_value = []
+        with patch(
+            "batch_live_reconciliation_service.stages.stage3c_batch_paper_recon.get_storage_client",
+            return_value=mock_client,
+        ):
+            result = run_stage3c(mock_config, "2026-05-15", dry_run=False)
+
+        assert result.status == ReconStatus.PASSED
+
+    def test_within_threshold_returns_passed(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            BatchPaperThresholds,
+        )
+        from batch_live_reconciliation_service.stages.stage3c_batch_paper_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        batch = [{"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0}]
+        paper = [{"realized_pnl": 102.0, "position_size": 5.1, "order_latency_ms": 100.0}]
+        metrics = _compute_metrics(batch, paper)
+        deviations = _check_deviations(metrics, BatchPaperThresholds())
+
+        assert len(deviations) == 0
+
+    def test_fill_count_breach_detected(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            BatchPaperThresholds,
+        )
+        from batch_live_reconciliation_service.stages.stage3c_batch_paper_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        batch = [
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+        ]
+        paper = [
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+            {"realized_pnl": 100.0, "position_size": 5.0, "order_latency_ms": 50.0},
+        ]
+        metrics = _compute_metrics(batch, paper)
+        deviations = _check_deviations(metrics, BatchPaperThresholds())
+
+        fill_devs = [d for d in deviations if d.metric_name == "fill_count_delta_pct"]
+        assert len(fill_devs) == 1
+
+    def test_stage_report_stage_is_batch_paper_recon(self, mock_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage3c_batch_paper_recon import run_stage3c
+
+        result = run_stage3c(mock_config, "2026-05-15", dry_run=True)
+        assert result.stage == ReconStage.BATCH_PAPER_RECON
+
+
+# ---------------------------------------------------------------------------
+# PaperLiveThresholds + BatchPaperThresholds + FailureRoutingAction
+# ---------------------------------------------------------------------------
+
+
+class TestNewThresholdsAndRouting:
+    def test_paper_live_thresholds_tighter_than_execution(self) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            EXECUTION_THRESHOLDS,
+            PAPER_LIVE_THRESHOLDS,
+        )
+
+        assert PAPER_LIVE_THRESHOLDS.alpha_pnl_gap_max < EXECUTION_THRESHOLDS.alpha_pnl_gap_max
+        assert PAPER_LIVE_THRESHOLDS.fill_rate_delta_max < EXECUTION_THRESHOLDS.fill_rate_delta_max
+        assert (
+            PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max
+            < EXECUTION_THRESHOLDS.slippage_delta_bps_max
+        )
+
+    def test_batch_paper_thresholds_wider_than_paper_live(self) -> None:
+        from batch_live_reconciliation_service.models.deviation_thresholds import (
+            BATCH_PAPER_THRESHOLDS,
+            PAPER_LIVE_THRESHOLDS,
+        )
+
+        assert BATCH_PAPER_THRESHOLDS.pnl_delta_pct_max > PAPER_LIVE_THRESHOLDS.alpha_pnl_gap_max
+
+    def test_failure_routing_action_values(self) -> None:
+        from batch_live_reconciliation_service.models.recon_report import FailureRoutingAction
+
+        assert FailureRoutingAction.ALERT == "alert"
+        assert FailureRoutingAction.AUTO_PAUSE_LIVE == "auto_pause_live"
+        assert FailureRoutingAction.AUTO_DEMOTE_TO_PAPER == "auto_demote_to_paper"
+
+    def test_paper_live_recon_stage_in_enum(self) -> None:
+        assert ReconStage.PAPER_LIVE_RECON == "paper_live_recon"
+
+    def test_batch_paper_recon_stage_in_enum(self) -> None:
+        assert ReconStage.BATCH_PAPER_RECON == "batch_paper_recon"
+
+
+# ---------------------------------------------------------------------------
 # Stage 4: Agent Analysis
 # ---------------------------------------------------------------------------
 

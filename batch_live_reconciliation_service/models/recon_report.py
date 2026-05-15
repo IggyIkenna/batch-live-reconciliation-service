@@ -25,8 +25,21 @@ class ReconStage(StrEnum):
     ML_RECON = "ml_recon"
     STRATEGY_RECON = "strategy_recon"
     EXECUTION_RECON = "execution_recon"
+    PAPER_LIVE_RECON = "paper_live_recon"
+    BATCH_PAPER_RECON = "batch_paper_recon"
     AGENT_ANALYSIS = "agent_analysis"
     RESULTS_WRITER = "results_writer"
+
+
+class FailureRoutingAction(StrEnum):
+    """Closed-set policy for paper-vs-live / batch-vs-paper deviation failures.
+
+    pvl-p21a: alert is always emitted; escalation determines automatic system response.
+    """
+
+    ALERT = "alert"
+    AUTO_PAUSE_LIVE = "auto_pause_live"
+    AUTO_DEMOTE_TO_PAPER = "auto_demote_to_paper"
 
 
 class ReconStatus(StrEnum):
