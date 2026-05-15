@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from io import BytesIO
 
-from unified_trading_library import get_storage_client, log_event
+from unified_trading_library import get_storage_client, log_event, reconcile_shard
 
 from batch_live_reconciliation_service.config import ReconConfig
 from batch_live_reconciliation_service.models.deviation_thresholds import (
@@ -52,6 +52,7 @@ class _ServiceReconResult:
     live_rows: int = 0
     has_live_partition: bool = False
     error: str | None = None
+    shard_verdict: str | None = None
 
     @property
     def files_match(self) -> bool:
@@ -104,6 +105,7 @@ class _BlobStats:
     file_count: int = 0
     row_count: int = 0
     errors: list[str] = field(default_factory=list)
+    sample_rows: list[dict[str, object]] = field(default_factory=list)
 
 
 def _count_blobs_and_rows(bucket_name: str, prefix: str) -> _BlobStats:
@@ -138,9 +140,9 @@ def _count_blobs_and_rows(bucket_name: str, prefix: str) -> _BlobStats:
         if blob_name.endswith(".parquet"):
             try:
                 raw = client.download_bytes(bucket=bucket_name, blob_path=blob_name)
-                # Parquet footer contains row count in the last 8 bytes (before magic)
-                # Use pyarrow if available, otherwise count file as 1 row
                 stats.row_count += _count_parquet_rows(raw)
+                if not stats.sample_rows:
+                    stats.sample_rows = _parse_parquet_sample(raw)
             except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as exc:
                 msg = f"Error reading parquet gs://{bucket_name}/{blob_name}: {exc}"
                 logger.warning("%s", msg)
@@ -169,6 +171,17 @@ def _count_parquet_rows(raw_bytes: bytes) -> int:
 
     pf = pq.ParquetFile(BytesIO(raw_bytes))
     return pf.metadata.num_rows
+
+
+def _parse_parquet_sample(raw_bytes: bytes, max_rows: int = 100) -> list[dict[str, object]]:
+    """Parse up to max_rows from parquet bytes as row dicts for reconcile_shard."""
+    import pyarrow.parquet as pq  # noqa: qg-inside-import — heavy dep, lazy import
+
+    table = pq.ParquetFile(BytesIO(raw_bytes)).read()
+    if table.num_rows == 0:
+        return []
+    limit = min(table.num_rows, max_rows)
+    return [{col: table.column(col)[i].as_py() for col in table.column_names} for i in range(limit)]
 
 
 def _get_bucket_for_service(config: ReconConfig, bucket_attr_prefix: str, category: str) -> str:
@@ -217,6 +230,36 @@ def _reconcile_service(
     result.live_files = live_stats.file_count
     result.live_rows = live_stats.row_count
     result.has_live_partition = live_stats.file_count > 0
+
+    # Deep shard comparison via UTL reconcile_shard() when both sides have parquet data
+    if batch_stats.sample_rows and live_stats.sample_rows:
+        try:
+            shard_report = reconcile_shard(
+                asset_group=category,
+                venue=service_name,
+                data_type="raw",
+                instrument_id="sample",
+                day=date,
+                batch_rows=batch_stats.sample_rows,
+                live_rows=live_stats.sample_rows,
+            )
+            result.shard_verdict = shard_report.verdict
+            if shard_report.verdict in ("SCHEMA_MISMATCH", "VALUE_MISMATCH"):
+                note = "; ".join(shard_report.notes) if shard_report.notes else ""
+                logger.warning(
+                    "[Data Pipeline Recon] shard %s/%s verdict=%s notes=%s",
+                    service_name,
+                    category,
+                    shard_report.verdict,
+                    note,
+                )
+        except (ValueError, TypeError, AttributeError, RuntimeError) as exc:
+            logger.warning(
+                "[Data Pipeline Recon] reconcile_shard failed for %s/%s: %s",
+                service_name,
+                category,
+                exc,
+            )
 
     all_errors = batch_stats.errors + live_stats.errors
     if all_errors:
@@ -296,6 +339,41 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 description=(
                     f"{len(missing_live)} service(s) have batch data but no live partition: "
                     f"{', '.join(missing_names)}"
+                ),
+            )
+        )
+
+    # Check for schema or value mismatches detected by reconcile_shard()
+    schema_mismatches = [r for r in results if r.shard_verdict == "SCHEMA_MISMATCH"]
+    if schema_mismatches:
+        names = [f"{r.service_name}/{r.category}" for r in schema_mismatches]
+        deviations.append(
+            DeviationRecord(
+                metric_name="shard_schema_mismatch",
+                stage=ReconStage.DATA_PIPELINE_RECON,
+                actual_value=float(len(schema_mismatches)),
+                threshold=0.0,
+                direction="above",
+                description=(
+                    f"{len(schema_mismatches)} service(s) have batch/live schema drift: "
+                    f"{', '.join(names)}"
+                ),
+            )
+        )
+
+    value_mismatches = [r for r in results if r.shard_verdict == "VALUE_MISMATCH"]
+    if value_mismatches:
+        names = [f"{r.service_name}/{r.category}" for r in value_mismatches]
+        deviations.append(
+            DeviationRecord(
+                metric_name="shard_value_mismatch",
+                stage=ReconStage.DATA_PIPELINE_RECON,
+                actual_value=float(len(value_mismatches)),
+                threshold=0.0,
+                direction="above",
+                description=(
+                    f"{len(value_mismatches)} service(s) have batch/live value drift: "
+                    f"{', '.join(names)}"
                 ),
             )
         )
@@ -382,6 +460,9 @@ def run_data_pipeline_recon(config: ReconConfig, date: str, dry_run: bool = Fals
     )
     services_with_errors = sum(1 for r in results if r.error is not None)
 
+    services_with_schema_mismatch = sum(1 for r in results if r.shard_verdict == "SCHEMA_MISMATCH")
+    services_with_value_mismatch = sum(1 for r in results if r.shard_verdict == "VALUE_MISMATCH")
+
     metrics: dict[str, float] = {
         "total_batch_files": float(total_batch_files),
         "total_live_files": float(total_live_files),
@@ -390,6 +471,8 @@ def run_data_pipeline_recon(config: ReconConfig, date: str, dry_run: bool = Fals
         "services_checked": float(len(results)),
         "services_with_no_live_partition": float(services_with_no_live),
         "services_with_errors": float(services_with_errors),
+        "services_with_schema_mismatch": float(services_with_schema_mismatch),
+        "services_with_value_mismatch": float(services_with_value_mismatch),
     }
 
     deviations = _check_deviations(results)

@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from unified_trading_library import GCSEventSink, log_event, setup_events
 
 from batch_live_reconciliation_service.config import ReconConfig, get_recon_config
+from batch_live_reconciliation_service.models.deviation_thresholds import PAPER_LIVE_THRESHOLDS
 from batch_live_reconciliation_service.models.recon_report import (
     ReconReport,
     ReconStatus,
@@ -31,6 +32,8 @@ from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import 
 from batch_live_reconciliation_service.stages.stage1_ml_recon import run_stage1
 from batch_live_reconciliation_service.stages.stage2_strategy_recon import run_stage2
 from batch_live_reconciliation_service.stages.stage3_execution_recon import run_stage3
+from batch_live_reconciliation_service.stages.stage3b_paper_live_recon import run_stage3b
+from batch_live_reconciliation_service.stages.stage3c_batch_paper_recon import run_stage3c
 from batch_live_reconciliation_service.stages.stage4_agent_analysis import run_stage4
 from batch_live_reconciliation_service.stages.stage5_results_writer import run_stage5
 
@@ -103,8 +106,32 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
     s3 = run_stage3(config, date, dry_run=dry_run)
     report.stages.append(s3)
 
-    # Stage 4: Agent analysis (uses results from data pipeline + stages 1-3)
-    s4 = run_stage4(config, date, stage_reports=[s0_data, s1, s2, s3], dry_run=dry_run)
+    # Stage 3b: Paper-vs-live reconciliation (pvl-p21a)
+    s3b = run_stage3b(config, date, dry_run=dry_run)
+    report.stages.append(s3b)
+
+    # Emit BATCH_LIVE_RECON_DRIFT when paper-vs-live slippage exceeds 5bps threshold.
+    # Alerting-service hooks this event for Telegram + PagerDuty routing.
+    slippage_bps = s3b.metrics.get("slippage_delta_bps", 0.0)
+    if slippage_bps > PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max:
+        log_event(
+            "BATCH_LIVE_RECON_DRIFT",
+            details={
+                "date": date,
+                "run_id": run_id,
+                "slippage_delta_bps": slippage_bps,
+                "threshold_bps": PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max,
+                "stage3b_deviations": len(s3b.deviations),
+                "routing": "ALERT_AND_AUTO_DEMOTE",
+            },
+        )
+
+    # Stage 3c: Batch-vs-paper reconciliation
+    s3c = run_stage3c(config, date, dry_run=dry_run)
+    report.stages.append(s3c)
+
+    # Stage 4: Agent analysis (uses results from data pipeline + stages 1-3b-3c)
+    s4 = run_stage4(config, date, stage_reports=[s0_data, s1, s2, s3, s3b, s3c], dry_run=dry_run)
     report.stages.append(s4)
     if s4.output_gcs_path:
         report.agent_report_gcs_path = s4.output_gcs_path

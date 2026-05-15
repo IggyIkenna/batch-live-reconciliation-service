@@ -749,6 +749,8 @@ class TestReconciliationOrchestrator:
             "stage1": self._make_passed_stage_report(ReconStage.ML_RECON),
             "stage2": self._make_passed_stage_report(ReconStage.STRATEGY_RECON),
             "stage3": self._make_passed_stage_report(ReconStage.EXECUTION_RECON),
+            "stage3b": self._make_passed_stage_report(ReconStage.PAPER_LIVE_RECON),
+            "stage3c": self._make_passed_stage_report(ReconStage.BATCH_PAPER_RECON),
             "stage4": self._make_passed_stage_report(ReconStage.AGENT_ANALYSIS),
             "stage5": self._make_passed_stage_report(ReconStage.RESULTS_WRITER),
         }
@@ -761,6 +763,8 @@ class TestReconciliationOrchestrator:
             patch.object(orch, "run_stage1", return_value=s_reports["stage1"]),
             patch.object(orch, "run_stage2", return_value=s_reports["stage2"]),
             patch.object(orch, "run_stage3", return_value=s_reports["stage3"]),
+            patch.object(orch, "run_stage3b", return_value=s_reports["stage3b"]),
+            patch.object(orch, "run_stage3c", return_value=s_reports["stage3c"]),
             patch.object(orch, "run_stage4", return_value=s_reports["stage4"]),
             patch.object(orch, "run_stage5", return_value=s_reports["stage5"]),
             patch.object(orch, "log_event"),
@@ -769,8 +773,8 @@ class TestReconciliationOrchestrator:
 
         assert report.status == ReconStatus.PASSED
         assert report.date == "2026-03-15"
-        # All 7 stages appended (Stage 0 + 0.5 + 1-5)
-        assert len(report.stages) == 7
+        # All 9 stages appended (Stage 0 + 0.5 + 1 + 2 + 3 + 3b + 3c + 4 + 5)
+        assert len(report.stages) == 9
 
     def test_run_reconciliation_stage0_fail_aborts(self) -> None:
         from batch_live_reconciliation_service.engine import orchestrator as orch
