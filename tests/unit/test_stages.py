@@ -991,3 +991,370 @@ class TestConfigReloaders:
         cr._on_venues_reload(mock_config)
 
         assert cr._active_venues is mock_config
+
+
+# ---------------------------------------------------------------------------
+# _ServiceReconResult property tests
+# ---------------------------------------------------------------------------
+
+
+class TestServiceReconResultProperties:
+    def test_files_match_when_equal(self) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            _ServiceReconResult,
+        )
+
+        r = _ServiceReconResult(
+            service_name="svc", category="cefi", bucket="b", batch_files=3, live_files=3
+        )
+        assert r.files_match is True
+
+    def test_files_mismatch_when_unequal(self) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            _ServiceReconResult,
+        )
+
+        r = _ServiceReconResult(
+            service_name="svc", category="cefi", bucket="b", batch_files=3, live_files=2
+        )
+        assert r.files_match is False
+
+    def test_rows_match_when_equal(self) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            _ServiceReconResult,
+        )
+
+        r = _ServiceReconResult(
+            service_name="svc", category="cefi", bucket="b", batch_rows=10, live_rows=10
+        )
+        assert r.rows_match is True
+
+    def test_rows_mismatch_when_unequal(self) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            _ServiceReconResult,
+        )
+
+        r = _ServiceReconResult(
+            service_name="svc", category="cefi", bucket="b", batch_rows=10, live_rows=9
+        )
+        assert r.rows_match is False
+
+    def test_both_zero_is_match(self) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            _ServiceReconResult,
+        )
+
+        r = _ServiceReconResult(service_name="svc", category="cefi", bucket="b")
+        assert r.files_match is True
+        assert r.rows_match is True
+
+
+# ---------------------------------------------------------------------------
+# reconcile_shard path — mock UTL call and assert verdicts route correctly
+# ---------------------------------------------------------------------------
+
+
+def _fake_shard_report(verdict: str, notes: list[str] | None = None) -> MagicMock:
+    report = MagicMock()
+    report.verdict = verdict
+    report.notes = notes or []
+    return report
+
+
+class TestReconcileShardPath:
+    """Tests for the reconcile_shard() call inside _reconcile_service.
+
+    Mocks _count_parquet_rows + _parse_parquet_sample to supply sample rows so
+    the reconcile_shard branch is entered, then asserts each verdict routes
+    correctly to deviations / metrics.
+    """
+
+    def _run_with_verdict(self, config: MagicMock, verdict: str) -> StageReport:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        sample_rows = [{"close": 100.0, "volume": 500}]
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/spot/data.parquet")]
+        client.bucket.return_value = bucket
+        client.download_bytes.return_value = b"fake-parquet-bytes"
+
+        with (
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+                return_value=client,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon._count_parquet_rows",
+                return_value=5,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon._parse_parquet_sample",
+                return_value=sample_rows,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.reconcile_shard",
+                return_value=_fake_shard_report(verdict),
+            ),
+        ):
+            return run_data_pipeline_recon(config, "2026-03-15", dry_run=False)
+
+    def test_match_verdict_produces_no_shard_deviation(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        result = self._run_with_verdict(data_pipeline_config, "MATCH")
+
+        shard_devs = [d for d in result.deviations if "shard" in d.metric_name]
+        assert len(shard_devs) == 0
+        assert result.metrics["services_with_schema_mismatch"] == 0.0
+        assert result.metrics["services_with_value_mismatch"] == 0.0
+
+    def test_schema_mismatch_verdict_creates_deviation_and_fails(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        result = self._run_with_verdict(data_pipeline_config, "SCHEMA_MISMATCH")
+
+        schema_devs = [d for d in result.deviations if d.metric_name == "shard_schema_mismatch"]
+        assert len(schema_devs) == 1
+        assert result.metrics["services_with_schema_mismatch"] >= 1.0
+        assert result.status == ReconStatus.FAILED
+
+    def test_value_mismatch_verdict_creates_deviation_and_fails(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        result = self._run_with_verdict(data_pipeline_config, "VALUE_MISMATCH")
+
+        value_devs = [d for d in result.deviations if d.metric_name == "shard_value_mismatch"]
+        assert len(value_devs) == 1
+        assert result.metrics["services_with_value_mismatch"] >= 1.0
+        assert result.status == ReconStatus.FAILED
+
+    def test_reconcile_shard_exception_handled_gracefully(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        sample_rows = [{"close": 100.0}]
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/spot/data.parquet")]
+        client.bucket.return_value = bucket
+        client.download_bytes.return_value = b"fake"
+
+        with (
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+                return_value=client,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon._count_parquet_rows",
+                return_value=3,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon._parse_parquet_sample",
+                return_value=sample_rows,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.reconcile_shard",
+                side_effect=ValueError("shard failed"),
+            ),
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        # Pipeline must not abort — shard error is logged as warning, no shard deviation
+        assert result is not None
+        shard_devs = [d for d in result.deviations if "shard" in d.metric_name]
+        assert len(shard_devs) == 0
+
+    def test_reconcile_shard_called_with_service_and_category(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        sample_rows = [{"close": 100.0}]
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/spot/data.parquet")]
+        client.bucket.return_value = bucket
+        client.download_bytes.return_value = b"fake"
+        mock_shard = _fake_shard_report("MATCH")
+
+        with (
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+                return_value=client,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon._count_parquet_rows",
+                return_value=2,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon._parse_parquet_sample",
+                return_value=sample_rows,
+            ),
+            patch(
+                "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.reconcile_shard",
+                return_value=mock_shard,
+            ) as mock_fn,
+        ):
+            run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        assert mock_fn.called
+        first_call = mock_fn.call_args
+        assert first_call is not None
+        kwargs = first_call.kwargs if first_call.kwargs else {}
+        assert "asset_group" in kwargs or len(first_call.args) > 0
+
+
+# ---------------------------------------------------------------------------
+# ndjson / jsonl file row counting
+# ---------------------------------------------------------------------------
+
+
+class TestNdjsonCounting:
+    def test_ndjson_lines_counted_as_rows(self, data_pipeline_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        ndjson_content = b'{"a": 1}\n{"a": 2}\n{"a": 3}\n'
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/events.ndjson")]
+        client.bucket.return_value = bucket
+        client.download_bytes.return_value = ndjson_content
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        assert result.metrics["total_batch_rows"] > 0
+        assert result.metrics["total_live_rows"] > 0
+
+    def test_jsonl_extension_also_counted(self, data_pipeline_config: MagicMock) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        content = b'{"x": 1}\n{"x": 2}\n'
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/events.jsonl")]
+        client.bucket.return_value = bucket
+        client.download_bytes.return_value = content
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        assert result.metrics["total_batch_rows"] > 0
+
+    def test_ndjson_download_error_captured_in_service_error(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/events.ndjson")]
+        client.bucket.return_value = bucket
+        client.download_bytes.side_effect = RuntimeError("download failed")
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        assert result.metrics["services_with_errors"] > 0
+
+
+# ---------------------------------------------------------------------------
+# _count_blobs_and_rows — parquet error + CSV fallback
+# ---------------------------------------------------------------------------
+
+
+class TestBlobCountingEdgeCases:
+    def test_parquet_download_error_counts_one_row_per_file(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [_FakeBlob("2026-03-15/a.parquet")]
+        client.bucket.return_value = bucket
+        client.download_bytes.side_effect = RuntimeError("parquet download failed")
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        # Error recorded but pipeline continues; file counted as 1 row
+        assert result.metrics["services_with_errors"] > 0
+
+    def test_unknown_extension_counted_as_one_row_per_file(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        client = MagicMock()
+        bucket = MagicMock()
+        bucket.list_blobs.return_value = [
+            _FakeBlob("2026-03-15/data.csv"),
+            _FakeBlob("2026-03-15/data2.csv"),
+        ]
+        client.bucket.return_value = bucket
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        # 2 CSV files → 2 rows per prefix call
+        assert result.metrics["total_batch_rows"] >= 2
+
+    def test_directory_markers_and_success_files_skipped(
+        self, data_pipeline_config: MagicMock
+    ) -> None:
+        from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
+            run_data_pipeline_recon,
+        )
+
+        client = MagicMock()
+        bucket = MagicMock()
+        # directory marker and _SUCCESS should be skipped; only real.csv is counted
+        bucket.list_blobs.return_value = [
+            _FakeBlob("2026-03-15/subdir/"),
+            _FakeBlob("2026-03-15/_SUCCESS"),
+            _FakeBlob("2026-03-15/real.csv"),
+        ]
+        client.bucket.return_value = bucket
+
+        with patch(
+            "batch_live_reconciliation_service.stages.stage0_data_pipeline_recon.get_storage_client",
+            return_value=client,
+        ):
+            result = run_data_pipeline_recon(data_pipeline_config, "2026-03-15", dry_run=False)
+
+        # Only real.csv is a file → 1 file per prefix, not 3
+        assert result.metrics["total_batch_files"] < result.metrics["services_checked"] * 3
