@@ -11,6 +11,10 @@ dependencies = [
     "pydantic<3.0.0,>=2.12.5",
     "unified-trading-library>=0.1.0,<1.0.0",
     "unified-api-contracts>=0.1.0,<1.0.0",
+    # Pinned to safe versions (CVE-2026-{34073,39892,44431,44432,28684})
+    "cryptography>=46.0.7,<47.0.0",
+    "urllib3>=2.7.0,<3.0.0",
+    "python-dotenv>=1.2.2,<2.0.0",
     "pytest<10.0.0,>=9.0.3",
     "pytest-cov<8.0.0,>=7.0.0",
     "pytest-socket>=0.7.0,<1.0.0",
