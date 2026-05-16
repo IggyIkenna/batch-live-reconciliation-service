@@ -246,10 +246,13 @@ class TestStage0DataPipelineRecon:
         cfg = MagicMock()
         cfg.gcp_project_id = "mock-project"
         # Deliberately leave all bucket attributes empty so every service/category
-        # hits the "no bucket configured" branch.
-        for cat in ("cefi", "tradfi", "defi"):
+        # hits the "no bucket configured" branch. Asset groups must match the
+        # full set the production code iterates (cefi/tradfi/defi/sports/prediction)
+        # — otherwise MagicMock returns truthy for unset attrs and services pass.
+        for cat in ("cefi", "tradfi", "defi", "sports", "prediction"):
             setattr(cfg, f"instruments_bucket_{cat}", "")
             setattr(cfg, f"market_data_tick_bucket_{cat}", "")
+            setattr(cfg, f"market_data_processing_bucket_{cat}", "")
 
         result = run_data_pipeline_recon(cfg, "2026-03-15", dry_run=False)
 
