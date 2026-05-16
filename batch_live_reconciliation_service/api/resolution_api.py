@@ -191,9 +191,7 @@ async def resolve_break(resolution: ReconciliationResolution) -> ResolveResponse
     return ResolveResponse(
         break_id=resolution.break_id,
         action=resolution.action.value,
-        status="resolved"
-        if resolution.action != ReconciliationAction.INVESTIGATE
-        else "investigating",
+        status="resolved" if resolution.action != ReconciliationAction.INVESTIGATE else "investigating",
         message=action_messages.get(resolution.action, "Break resolved"),
     )
 

@@ -59,9 +59,7 @@ def _upstream_available() -> bool:
 def _load_json(path: Path) -> list[dict[str, object]] | dict[str, object]:
     """Load JSON from path, return empty list if missing."""
     if path.exists():
-        raw: list[dict[str, object]] | dict[str, object] = cast(
-            "list[dict[str, object]]", json.loads(path.read_text())
-        )
+        raw: list[dict[str, object]] | dict[str, object] = cast("list[dict[str, object]]", json.loads(path.read_text()))
         return raw
     return []
 

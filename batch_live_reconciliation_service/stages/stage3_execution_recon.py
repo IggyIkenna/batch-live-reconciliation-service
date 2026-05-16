@@ -76,12 +76,10 @@ def _compute_metrics(
 
     # Alpha P&L gap: live fills P&L - batch fills P&L
     live_pnl = sum(
-        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
-        for e in live_fills
+        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0))) for e in live_fills
     )
     batch_pnl = sum(
-        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
-        for e in batch_fills
+        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0))) for e in batch_fills
     )
     notional = abs(live_pnl) or 1.0
     alpha_gap = abs(live_pnl - batch_pnl) / notional
@@ -106,9 +104,7 @@ def _compute_metrics(
     algo_accuracy = algo_correct / max(len(algo_events), 1)
 
     # P99 latency from live orders
-    latencies = [
-        float(cast(float, e.get("latency_ms", 0.0))) for e in live_fills if e.get("latency_ms")
-    ]
+    latencies = [float(cast(float, e.get("latency_ms", 0.0))) for e in live_fills if e.get("latency_ms")]
     latencies.sort()
     p99_latency = latencies[int(len(latencies) * 0.99)] if latencies else 0.0
 
@@ -147,20 +143,14 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
             metrics["slippage_delta_bps"],
             t.slippage_delta_bps_max,
             "above",
-            (
-                f"Slippage delta {metrics['slippage_delta_bps']:.1f}bps"
-                f" > {t.slippage_delta_bps_max:.0f}bps"
-            ),
+            (f"Slippage delta {metrics['slippage_delta_bps']:.1f}bps > {t.slippage_delta_bps_max:.0f}bps"),
         ),
         (
             "order_latency_p99_ms",
             metrics["order_latency_p99_ms"],
             t.order_latency_p99_ms_max,
             "above",
-            (
-                f"P99 latency {metrics['order_latency_p99_ms']:.0f}ms"
-                f" > {t.order_latency_p99_ms_max:.0f}ms"
-            ),
+            (f"P99 latency {metrics['order_latency_p99_ms']:.0f}ms > {t.order_latency_p99_ms_max:.0f}ms"),
         ),
     ]
 

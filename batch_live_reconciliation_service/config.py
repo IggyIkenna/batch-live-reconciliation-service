@@ -50,29 +50,17 @@ class ReconConfig(UnifiedCloudConfig):
             self.execution_store_bucket = f"execution-store-cefi-{project_id}"
         # Data pipeline buckets — derive from UTL get_bucket_name() (BUCKET_PREFIXES SSOT).
         if not self.instruments_bucket_cefi:
-            self.instruments_bucket_cefi = get_bucket_name(
-                "instruments", "CEFI", project_id=project_id
-            )
+            self.instruments_bucket_cefi = get_bucket_name("instruments", "CEFI", project_id=project_id)
         if not self.instruments_bucket_tradfi:
-            self.instruments_bucket_tradfi = get_bucket_name(
-                "instruments", "TRADFI", project_id=project_id
-            )
+            self.instruments_bucket_tradfi = get_bucket_name("instruments", "TRADFI", project_id=project_id)
         if not self.instruments_bucket_defi:
-            self.instruments_bucket_defi = get_bucket_name(
-                "instruments", "DEFI", project_id=project_id
-            )
+            self.instruments_bucket_defi = get_bucket_name("instruments", "DEFI", project_id=project_id)
         if not self.market_data_tick_bucket_cefi:
-            self.market_data_tick_bucket_cefi = get_bucket_name(
-                "market_data_tick", "CEFI", project_id=project_id
-            )
+            self.market_data_tick_bucket_cefi = get_bucket_name("market_data_tick", "CEFI", project_id=project_id)
         if not self.market_data_tick_bucket_tradfi:
-            self.market_data_tick_bucket_tradfi = get_bucket_name(
-                "market_data_tick", "TRADFI", project_id=project_id
-            )
+            self.market_data_tick_bucket_tradfi = get_bucket_name("market_data_tick", "TRADFI", project_id=project_id)
         if not self.market_data_tick_bucket_defi:
-            self.market_data_tick_bucket_defi = get_bucket_name(
-                "market_data_tick", "DEFI", project_id=project_id
-            )
+            self.market_data_tick_bucket_defi = get_bucket_name("market_data_tick", "DEFI", project_id=project_id)
 
 
 @lru_cache(maxsize=1)

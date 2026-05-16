@@ -337,8 +337,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 threshold=float(t.missing_live_partition_max),
                 direction="above",
                 description=(
-                    f"{len(missing_live)} service(s) have batch data but no live partition: "
-                    f"{', '.join(missing_names)}"
+                    f"{len(missing_live)} service(s) have batch data but no live partition: {', '.join(missing_names)}"
                 ),
             )
         )
@@ -354,10 +353,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 actual_value=float(len(schema_mismatches)),
                 threshold=0.0,
                 direction="above",
-                description=(
-                    f"{len(schema_mismatches)} service(s) have batch/live schema drift: "
-                    f"{', '.join(names)}"
-                ),
+                description=(f"{len(schema_mismatches)} service(s) have batch/live schema drift: {', '.join(names)}"),
             )
         )
 
@@ -371,10 +367,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 actual_value=float(len(value_mismatches)),
                 threshold=0.0,
                 direction="above",
-                description=(
-                    f"{len(value_mismatches)} service(s) have batch/live value drift: "
-                    f"{', '.join(names)}"
-                ),
+                description=(f"{len(value_mismatches)} service(s) have batch/live value drift: {', '.join(names)}"),
             )
         )
 
@@ -455,9 +448,7 @@ def run_data_pipeline_recon(config: ReconConfig, date: str, dry_run: bool = Fals
     total_live_files = sum(r.live_files for r in results)
     total_batch_rows = sum(r.batch_rows for r in results)
     total_live_rows = sum(r.live_rows for r in results)
-    services_with_no_live = sum(
-        1 for r in results if r.batch_files > 0 and not r.has_live_partition
-    )
+    services_with_no_live = sum(1 for r in results if r.batch_files > 0 and not r.has_live_partition)
     services_with_errors = sum(1 for r in results if r.error is not None)
 
     services_with_schema_mismatch = sum(1 for r in results if r.shard_verdict == "SCHEMA_MISMATCH")

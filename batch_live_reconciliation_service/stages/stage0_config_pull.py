@@ -57,9 +57,7 @@ def _load_config_snapshot(execution_store_bucket: str, date: str) -> dict[str, o
         logger.info("Loaded config snapshot: %d keys", len(snapshot))
         return snapshot
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as e:
-        raise FileNotFoundError(
-            f"Config snapshot not found: gs://{execution_store_bucket}/{blob_path}"
-        ) from e
+        raise FileNotFoundError(f"Config snapshot not found: gs://{execution_store_bucket}/{blob_path}") from e
 
 
 def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageReport:
@@ -93,9 +91,7 @@ def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
     # Check execution config snapshot
     config_blob = _EXPECTED_OUTPUTS["execution-config-snapshot"].format(date=date)
     if not _blob_exists(config.execution_store_bucket, config_blob):
-        missing.append(
-            f"execution config snapshot: gs://{config.execution_store_bucket}/{config_blob}"
-        )
+        missing.append(f"execution config snapshot: gs://{config.execution_store_bucket}/{config_blob}")
 
     # Check ML outputs
     ml_blob = _EXPECTED_OUTPUTS["ml-inference"].format(date=date)
@@ -110,9 +106,7 @@ def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
     if missing:
         error_msg = f"Missing upstream data for {date}: {'; '.join(missing)}"
         logger.error("[Stage 0] FAILED — %s", error_msg)
-        log_event(
-            "PROCESSING_COMPLETED", details={"stage": "stage0_config_pull", "status": "FAILED"}
-        )
+        log_event("PROCESSING_COMPLETED", details={"stage": "stage0_config_pull", "status": "FAILED"})
         return StageReport(
             stage=ReconStage.CONFIG_PULL,
             status=ReconStatus.FAILED,
@@ -125,9 +119,7 @@ def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
     try:
         _ = _load_config_snapshot(config.execution_store_bucket, date)
     except FileNotFoundError as e:
-        log_event(
-            "PROCESSING_COMPLETED", details={"stage": "stage0_config_pull", "status": "FAILED"}
-        )
+        log_event("PROCESSING_COMPLETED", details={"stage": "stage0_config_pull", "status": "FAILED"})
         return StageReport(
             stage=ReconStage.CONFIG_PULL,
             status=ReconStatus.FAILED,

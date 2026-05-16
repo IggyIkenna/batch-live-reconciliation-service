@@ -73,9 +73,7 @@ def start_domain_config_reloaders(service_config: ReconConfig) -> None:
     global _instrument_reloader, _venue_reloader
 
     config_store_bucket: str = str(service_config.config_store_bucket or "")
-    project_id: str | None = (
-        str(service_config.gcp_project_id) if service_config.gcp_project_id else None
-    )
+    project_id: str | None = str(service_config.gcp_project_id) if service_config.gcp_project_id else None
 
     if not config_store_bucket:
         logger.info("CONFIG_STORE_BUCKET not set — domain config hot-reload disabled")

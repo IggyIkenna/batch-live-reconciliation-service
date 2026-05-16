@@ -120,10 +120,7 @@ def _check_deviations(
             "position_delta",
             metrics["position_delta"],
             t.position_delta_max,
-            (
-                f"Batch-vs-paper position delta {metrics['position_delta']:.2f} units"
-                f" > {t.position_delta_max:.2f}"
-            ),
+            (f"Batch-vs-paper position delta {metrics['position_delta']:.2f} units > {t.position_delta_max:.2f}"),
         ),
         (
             "fill_count_delta_pct",

@@ -105,9 +105,7 @@ def _compute_metrics(
     order_latency_p99_ms = _p99(paper_events, "order_latency_ms")
 
     paper_algo_correct = [e.get("algo_correct", 1.0) for e in paper_events]
-    algo_selection_accuracy = (
-        sum(paper_algo_correct) / len(paper_algo_correct) if paper_algo_correct else 1.0
-    )
+    algo_selection_accuracy = sum(paper_algo_correct) / len(paper_algo_correct) if paper_algo_correct else 1.0
 
     return {
         "alpha_pnl_gap": alpha_pnl_gap,
@@ -132,20 +130,14 @@ def _check_deviations(
             "alpha_pnl_gap",
             metrics["alpha_pnl_gap"],
             t.alpha_pnl_gap_max,
-            (
-                f"Paper-vs-live alpha PnL gap {metrics['alpha_pnl_gap']:.2%}"
-                f" > {t.alpha_pnl_gap_max:.2%}"
-            ),
+            (f"Paper-vs-live alpha PnL gap {metrics['alpha_pnl_gap']:.2%} > {t.alpha_pnl_gap_max:.2%}"),
             FailureRoutingAction.AUTO_DEMOTE_TO_PAPER,
         ),
         (
             "fill_rate_delta",
             metrics["fill_rate_delta"],
             t.fill_rate_delta_max,
-            (
-                f"Paper-vs-live fill rate delta {metrics['fill_rate_delta']:.2%}"
-                f" > {t.fill_rate_delta_max:.2%}"
-            ),
+            (f"Paper-vs-live fill rate delta {metrics['fill_rate_delta']:.2%} > {t.fill_rate_delta_max:.2%}"),
             FailureRoutingAction.AUTO_DEMOTE_TO_PAPER,
         ),
         (
@@ -162,10 +154,7 @@ def _check_deviations(
             "order_latency_p99_ms",
             metrics["order_latency_p99_ms"],
             t.order_latency_p99_ms_max,
-            (
-                f"Paper P99 latency {metrics['order_latency_p99_ms']:.0f}ms"
-                f" > {t.order_latency_p99_ms_max:.0f}ms"
-            ),
+            (f"Paper P99 latency {metrics['order_latency_p99_ms']:.0f}ms > {t.order_latency_p99_ms_max:.0f}ms"),
             FailureRoutingAction.ALERT,
         ),
     ]
@@ -196,10 +185,7 @@ def _check_deviations(
                     actual_value=accuracy,
                     threshold=t.algo_selection_accuracy_min,
                     direction="below",
-                    description=(
-                        f"Paper algo selection accuracy {accuracy:.1%}"
-                        f" < {t.algo_selection_accuracy_min:.0%}"
-                    ),
+                    description=(f"Paper algo selection accuracy {accuracy:.1%} < {t.algo_selection_accuracy_min:.0%}"),
                 ),
                 routing_action=FailureRoutingAction.ALERT,
             )

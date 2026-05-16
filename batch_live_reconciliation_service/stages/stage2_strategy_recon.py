@@ -112,14 +112,10 @@ def _compute_metrics(
 
     # VaR delta
     batch_var = sum(
-        float(cast(float, e.get("var_1d", 0.0)))
-        for e in batch_events
-        if e.get("event_type") == "RISK_SNAPSHOT"
+        float(cast(float, e.get("var_1d", 0.0))) for e in batch_events if e.get("event_type") == "RISK_SNAPSHOT"
     )
     live_var = sum(
-        float(cast(float, e.get("var_1d", 0.0)))
-        for e in live_events
-        if e.get("event_type") == "RISK_SNAPSHOT"
+        float(cast(float, e.get("var_1d", 0.0))) for e in live_events if e.get("event_type") == "RISK_SNAPSHOT"
     )
     var_delta = abs(batch_var - live_var) / max(abs(live_var), 1.0)
 
@@ -190,9 +186,7 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                 actual_value=metrics["var_delta_pct"],
                 threshold=t.var_delta_pct_max,
                 direction="above",
-                description=(
-                    f"VaR delta {metrics['var_delta_pct']:.1%} > {t.var_delta_pct_max:.0%}"
-                ),
+                description=(f"VaR delta {metrics['var_delta_pct']:.1%} > {t.var_delta_pct_max:.0%}"),
             )
         )
 

@@ -134,9 +134,7 @@ def run_stage4(
 
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, OSError) as e:
         logger.exception("[Stage 4] Agent analysis failed: %s", e)
-        log_event(
-            "PROCESSING_COMPLETED", details={"stage": "stage4_agent_analysis", "status": "FAILED"}
-        )
+        log_event("PROCESSING_COMPLETED", details={"stage": "stage4_agent_analysis", "status": "FAILED"})
         return StageReport(
             stage=ReconStage.AGENT_ANALYSIS,
             status=ReconStatus.FAILED,
