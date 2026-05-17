@@ -19,15 +19,17 @@ def test_config_bucket_derivation() -> None:
 
 def test_config_dry_run_default() -> None:
     """Test that dry_run defaults to False."""
-    from batch_live_reconciliation_service.config import ReconConfig
+    with patch.dict(os.environ, {"GCP_PROJECT_ID": "test-project", "CLOUD_PROVIDER": "local"}):
+        from batch_live_reconciliation_service.config import ReconConfig
 
-    config = ReconConfig(cloud_provider="local")
-    assert config.dry_run is False
+        config = ReconConfig(cloud_provider="local")
+        assert config.dry_run is False
 
 
 def test_config_stage_timeout_default() -> None:
     """Test that stage_timeout_seconds has a sensible default."""
-    from batch_live_reconciliation_service.config import ReconConfig
+    with patch.dict(os.environ, {"GCP_PROJECT_ID": "test-project", "CLOUD_PROVIDER": "local"}):
+        from batch_live_reconciliation_service.config import ReconConfig
 
-    config = ReconConfig(cloud_provider="local")
-    assert config.stage_timeout_seconds == 1800
+        config = ReconConfig(cloud_provider="local")
+        assert config.stage_timeout_seconds == 1800

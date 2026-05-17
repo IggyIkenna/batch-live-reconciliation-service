@@ -244,9 +244,7 @@ class TestMockDataProvider:
         from batch_live_reconciliation_service.engine.mock_data_provider import run_mock_pipeline
 
         # Create the seed marker so the pipeline returns early
-        service_seed = (
-            tmp_path / ".local-dev-cache" / "mock-seed" / "batch-live-reconciliation-service"
-        )
+        service_seed = tmp_path / ".local-dev-cache" / "mock-seed" / "batch-live-reconciliation-service"
         service_seed.mkdir(parents=True)
         (service_seed / ".seed-complete").write_text("{}")
 
@@ -263,13 +261,7 @@ class TestMockDataProvider:
             result = run_mock_pipeline()
 
         assert result == 0
-        marker = (
-            tmp_path
-            / ".local-dev-cache"
-            / "mock-seed"
-            / "batch-live-reconciliation-service"
-            / ".seed-complete"
-        )
+        marker = tmp_path / ".local-dev-cache" / "mock-seed" / "batch-live-reconciliation-service" / ".seed-complete"
         assert marker.exists()
 
 

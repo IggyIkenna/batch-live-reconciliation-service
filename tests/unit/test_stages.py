@@ -126,9 +126,7 @@ class TestStage0ConfigPull:
         from batch_live_reconciliation_service.stages.stage0_config_pull import _blob_exists
 
         mock_client = MagicMock()
-        mock_client.bucket.return_value.blob.return_value.exists.side_effect = RuntimeError(
-            "GCS error"
-        )
+        mock_client.bucket.return_value.blob.return_value.exists.side_effect = RuntimeError("GCS error")
         with patch(
             "batch_live_reconciliation_service.stages.stage0_config_pull.get_storage_client",
             return_value=mock_client,
@@ -617,10 +615,7 @@ class TestNewThresholdsAndRouting:
 
         assert PAPER_LIVE_THRESHOLDS.alpha_pnl_gap_max < EXECUTION_THRESHOLDS.alpha_pnl_gap_max
         assert PAPER_LIVE_THRESHOLDS.fill_rate_delta_max < EXECUTION_THRESHOLDS.fill_rate_delta_max
-        assert (
-            PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max
-            < EXECUTION_THRESHOLDS.slippage_delta_bps_max
-        )
+        assert PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max < EXECUTION_THRESHOLDS.slippage_delta_bps_max
 
     def test_batch_paper_thresholds_wider_than_paper_live(self) -> None:
         from batch_live_reconciliation_service.models.deviation_thresholds import (
@@ -650,30 +645,22 @@ class TestNewThresholdsAndRouting:
 
 
 class TestStage4AgentAnalysis:
-    def test_dry_run_returns_passed(
-        self, mock_config: MagicMock, mock_stage_report: StageReport
-    ) -> None:
+    def test_dry_run_returns_passed(self, mock_config: MagicMock, mock_stage_report: StageReport) -> None:
         from batch_live_reconciliation_service.stages.stage4_agent_analysis import run_stage4
 
-        result = run_stage4(
-            mock_config, "2026-03-15", stage_reports=[mock_stage_report], dry_run=True
-        )
+        result = run_stage4(mock_config, "2026-03-15", stage_reports=[mock_stage_report], dry_run=True)
 
         assert result.stage == ReconStage.AGENT_ANALYSIS
         assert result.status == ReconStatus.PASSED
 
-    def test_gcs_error_returns_failed(
-        self, mock_config: MagicMock, mock_stage_report: StageReport
-    ) -> None:
+    def test_gcs_error_returns_failed(self, mock_config: MagicMock, mock_stage_report: StageReport) -> None:
         from batch_live_reconciliation_service.stages.stage4_agent_analysis import run_stage4
 
         with patch(
             "batch_live_reconciliation_service.stages.stage4_agent_analysis.get_storage_client",
             side_effect=RuntimeError("GCS unavailable"),
         ):
-            result = run_stage4(
-                mock_config, "2026-03-15", stage_reports=[mock_stage_report], dry_run=False
-            )
+            result = run_stage4(mock_config, "2026-03-15", stage_reports=[mock_stage_report], dry_run=False)
 
         assert result.status == ReconStatus.FAILED
 
@@ -684,9 +671,7 @@ class TestStage4AgentAnalysis:
 
 
 class TestStage5ResultsWriter:
-    def test_dry_run_returns_passed(
-        self, mock_config: MagicMock, mock_recon_report: ReconReport
-    ) -> None:
+    def test_dry_run_returns_passed(self, mock_config: MagicMock, mock_recon_report: ReconReport) -> None:
         from batch_live_reconciliation_service.stages.stage5_results_writer import run_stage5
 
         result = run_stage5(mock_config, mock_recon_report, dry_run=True)
@@ -695,9 +680,7 @@ class TestStage5ResultsWriter:
         assert result.status == ReconStatus.PASSED
         assert result.output_gcs_path is not None
 
-    def test_gcs_upload_error_returns_failed(
-        self, mock_config: MagicMock, mock_recon_report: ReconReport
-    ) -> None:
+    def test_gcs_upload_error_returns_failed(self, mock_config: MagicMock, mock_recon_report: ReconReport) -> None:
         from batch_live_reconciliation_service.stages.stage5_results_writer import run_stage5
 
         mock_client = MagicMock()
@@ -1007,9 +990,7 @@ class TestServiceReconResultProperties:
             _ServiceReconResult,
         )
 
-        r = _ServiceReconResult(
-            service_name="svc", category="cefi", bucket="b", batch_files=3, live_files=3
-        )
+        r = _ServiceReconResult(service_name="svc", category="cefi", bucket="b", batch_files=3, live_files=3)
         assert r.files_match is True
 
     def test_files_mismatch_when_unequal(self) -> None:
@@ -1017,9 +998,7 @@ class TestServiceReconResultProperties:
             _ServiceReconResult,
         )
 
-        r = _ServiceReconResult(
-            service_name="svc", category="cefi", bucket="b", batch_files=3, live_files=2
-        )
+        r = _ServiceReconResult(service_name="svc", category="cefi", bucket="b", batch_files=3, live_files=2)
         assert r.files_match is False
 
     def test_rows_match_when_equal(self) -> None:
@@ -1027,9 +1006,7 @@ class TestServiceReconResultProperties:
             _ServiceReconResult,
         )
 
-        r = _ServiceReconResult(
-            service_name="svc", category="cefi", bucket="b", batch_rows=10, live_rows=10
-        )
+        r = _ServiceReconResult(service_name="svc", category="cefi", bucket="b", batch_rows=10, live_rows=10)
         assert r.rows_match is True
 
     def test_rows_mismatch_when_unequal(self) -> None:
@@ -1037,9 +1014,7 @@ class TestServiceReconResultProperties:
             _ServiceReconResult,
         )
 
-        r = _ServiceReconResult(
-            service_name="svc", category="cefi", bucket="b", batch_rows=10, live_rows=9
-        )
+        r = _ServiceReconResult(service_name="svc", category="cefi", bucket="b", batch_rows=10, live_rows=9)
         assert r.rows_match is False
 
     def test_both_zero_is_match(self) -> None:
@@ -1104,9 +1079,7 @@ class TestReconcileShardPath:
         ):
             return run_data_pipeline_recon(config, "2026-03-15", dry_run=False)
 
-    def test_match_verdict_produces_no_shard_deviation(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_match_verdict_produces_no_shard_deviation(self, data_pipeline_config: MagicMock) -> None:
         result = self._run_with_verdict(data_pipeline_config, "MATCH")
 
         shard_devs = [d for d in result.deviations if "shard" in d.metric_name]
@@ -1114,9 +1087,7 @@ class TestReconcileShardPath:
         assert result.metrics["services_with_schema_mismatch"] == 0.0
         assert result.metrics["services_with_value_mismatch"] == 0.0
 
-    def test_schema_mismatch_verdict_creates_deviation_and_fails(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_schema_mismatch_verdict_creates_deviation_and_fails(self, data_pipeline_config: MagicMock) -> None:
         result = self._run_with_verdict(data_pipeline_config, "SCHEMA_MISMATCH")
 
         schema_devs = [d for d in result.deviations if d.metric_name == "shard_schema_mismatch"]
@@ -1124,9 +1095,7 @@ class TestReconcileShardPath:
         assert result.metrics["services_with_schema_mismatch"] >= 1.0
         assert result.status == ReconStatus.FAILED
 
-    def test_value_mismatch_verdict_creates_deviation_and_fails(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_value_mismatch_verdict_creates_deviation_and_fails(self, data_pipeline_config: MagicMock) -> None:
         result = self._run_with_verdict(data_pipeline_config, "VALUE_MISMATCH")
 
         value_devs = [d for d in result.deviations if d.metric_name == "shard_value_mismatch"]
@@ -1134,9 +1103,7 @@ class TestReconcileShardPath:
         assert result.metrics["services_with_value_mismatch"] >= 1.0
         assert result.status == ReconStatus.FAILED
 
-    def test_reconcile_shard_exception_handled_gracefully(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_reconcile_shard_exception_handled_gracefully(self, data_pipeline_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
             run_data_pipeline_recon,
         )
@@ -1173,9 +1140,7 @@ class TestReconcileShardPath:
         shard_devs = [d for d in result.deviations if "shard" in d.metric_name]
         assert len(shard_devs) == 0
 
-    def test_reconcile_shard_called_with_service_and_category(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_reconcile_shard_called_with_service_and_category(self, data_pipeline_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
             run_data_pipeline_recon,
         )
@@ -1262,9 +1227,7 @@ class TestNdjsonCounting:
 
         assert result.metrics["total_batch_rows"] > 0
 
-    def test_ndjson_download_error_captured_in_service_error(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_ndjson_download_error_captured_in_service_error(self, data_pipeline_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
             run_data_pipeline_recon,
         )
@@ -1290,9 +1253,7 @@ class TestNdjsonCounting:
 
 
 class TestBlobCountingEdgeCases:
-    def test_parquet_download_error_counts_one_row_per_file(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_parquet_download_error_counts_one_row_per_file(self, data_pipeline_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
             run_data_pipeline_recon,
         )
@@ -1312,9 +1273,7 @@ class TestBlobCountingEdgeCases:
         # Error recorded but pipeline continues; file counted as 1 row
         assert result.metrics["services_with_errors"] > 0
 
-    def test_unknown_extension_counted_as_one_row_per_file(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_unknown_extension_counted_as_one_row_per_file(self, data_pipeline_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
             run_data_pipeline_recon,
         )
@@ -1336,9 +1295,7 @@ class TestBlobCountingEdgeCases:
         # 2 CSV files → 2 rows per prefix call
         assert result.metrics["total_batch_rows"] >= 2
 
-    def test_directory_markers_and_success_files_skipped(
-        self, data_pipeline_config: MagicMock
-    ) -> None:
+    def test_directory_markers_and_success_files_skipped(self, data_pipeline_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage0_data_pipeline_recon import (
             run_data_pipeline_recon,
         )
