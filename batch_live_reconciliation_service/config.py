@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import override
 
-from unified_trading_library import UnifiedCloudConfig, get_bucket_name
+from unified_trading_library import UnifiedCloudConfig, get_cloud_provider, resolve_bucket_name
 
 
 class ReconConfig(UnifiedCloudConfig):
@@ -48,19 +48,31 @@ class ReconConfig(UnifiedCloudConfig):
             self.events_bucket = f"{project_id}-events"
         if not self.execution_store_bucket:
             self.execution_store_bucket = f"execution-store-cefi-{project_id}"
-        # Data pipeline buckets — derive from UTL get_bucket_name() (BUCKET_PREFIXES SSOT).
+        # Data pipeline buckets — resolve via resolve_bucket_name (bucket-name SSOT).
         if not self.instruments_bucket_cefi:
-            self.instruments_bucket_cefi = get_bucket_name("instruments", "CEFI", project_id=project_id)
+            self.instruments_bucket_cefi = resolve_bucket_name(
+                cloud=get_cloud_provider(), kind="instruments-store", asset_group="cefi"
+            )
         if not self.instruments_bucket_tradfi:
-            self.instruments_bucket_tradfi = get_bucket_name("instruments", "TRADFI", project_id=project_id)
+            self.instruments_bucket_tradfi = resolve_bucket_name(
+                cloud=get_cloud_provider(), kind="instruments-store", asset_group="tradfi"
+            )
         if not self.instruments_bucket_defi:
-            self.instruments_bucket_defi = get_bucket_name("instruments", "DEFI", project_id=project_id)
+            self.instruments_bucket_defi = resolve_bucket_name(
+                cloud=get_cloud_provider(), kind="instruments-store", asset_group="defi"
+            )
         if not self.market_data_tick_bucket_cefi:
-            self.market_data_tick_bucket_cefi = get_bucket_name("market_data_tick", "CEFI", project_id=project_id)
+            self.market_data_tick_bucket_cefi = resolve_bucket_name(
+                cloud=get_cloud_provider(), kind="market-data", asset_group="cefi"
+            )
         if not self.market_data_tick_bucket_tradfi:
-            self.market_data_tick_bucket_tradfi = get_bucket_name("market_data_tick", "TRADFI", project_id=project_id)
+            self.market_data_tick_bucket_tradfi = resolve_bucket_name(
+                cloud=get_cloud_provider(), kind="market-data", asset_group="tradfi"
+            )
         if not self.market_data_tick_bucket_defi:
-            self.market_data_tick_bucket_defi = get_bucket_name("market_data_tick", "DEFI", project_id=project_id)
+            self.market_data_tick_bucket_defi = resolve_bucket_name(
+                cloud=get_cloud_provider(), kind="market-data", asset_group="defi"
+            )
 
 
 @lru_cache(maxsize=1)
