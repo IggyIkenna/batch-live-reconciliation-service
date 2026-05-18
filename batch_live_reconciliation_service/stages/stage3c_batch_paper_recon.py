@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime
+from typing import cast
 
 from unified_trading_library import get_storage_client, log_event
 
@@ -53,7 +54,7 @@ def _load_events(bucket_name: str, prefix: str) -> list[dict[str, float]]:
         for line in raw.splitlines():
             line = line.strip()
             if line:
-                events.append(json.loads(line))
+                events.append(cast(dict[str, float], json.loads(line)))
     return events
 
 

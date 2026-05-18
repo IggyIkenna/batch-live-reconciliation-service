@@ -1,0 +1,42 @@
+{
+  "include": ["batch_live_reconciliation_service", "tests"],
+  "exclude": [
+    "batch_live_reconciliation_service/stages/stage0_data_pipeline_recon.py",
+    "tests",
+    "build",
+    "dist",
+    "*.egg-info",
+    ".eggs",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    ".venv.backup"
+  ],
+  "typeCheckingMode": "strict",
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": false,
+  "reportAny": "error",
+  "reportUnknownArgumentType": "error",
+  "reportUnknownMemberType": "error",
+  "reportUnknownParameterType": "error",
+  "reportUnknownVariableType": "error",
+  "reportMissingParameterType": "error",
+  "reportArgumentType": "error",
+  "reportReturnType": "error",
+  "reportAssignmentType": "error",
+  "reportCallIssue": "error",
+  "reportGeneralTypeIssues": "error",
+  "reportIndexIssue": "error",
+  "reportOptionalMemberAccess": "error",
+  "reportAttributeAccessIssue": "error",
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [
+    "../unified-config-interface",
+    "../unified-internal-contracts",
+    "../unified-trading-library",
+    "../unified-cloud-interface",
+    "../unified-api-contracts"
+  ]
+}

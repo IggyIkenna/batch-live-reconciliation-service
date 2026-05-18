@@ -45,6 +45,7 @@ typeCheckingMode = "strict"
 reportAny = "error"
 reportUnknownMemberType = "error"
 reportUnknownVariableType = "error"
+reportMissingTypeStubs = false
 
 [tool.ruff]
 target-version = "py313"
