@@ -64,7 +64,7 @@ testpaths = ["tests"]
 # the workspace floor of 70 set by scripts/quality-gates.sh; explicit
 # pyproject declaration so direct pytest runs honor the same threshold.
 [tool.coverage.report]
-fail_under = 70
+fail_under = 80
 show_missing = true
 skip_covered = false
 precision = 1
