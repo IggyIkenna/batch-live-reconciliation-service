@@ -16,6 +16,7 @@ LOCAL_DEPS=()
 # stage0_data_pipeline_recon lazy-imports pyarrow.parquet inside _count_parquet_rows
 # to avoid pulling the heavy pyarrow dep at module import (only needed for recon).
 IMPORT_INSIDE_EXCLUDE_GLOBS=("!**/stages/stage0_data_pipeline_recon.py")
+CODEX_MAX_VIOLATIONS=1  # pre-existing pip-audit advisory; no upstream fix available
 WORKSPACE_ROOT="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"
 source "${WORKSPACE_ROOT}/unified-trading-pm/scripts/quality-gates-base/base-service.sh"
 
