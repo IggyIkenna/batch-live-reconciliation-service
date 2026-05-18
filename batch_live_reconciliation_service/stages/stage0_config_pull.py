@@ -57,7 +57,7 @@ def _load_config_snapshot(execution_store_bucket: str, date: str) -> dict[str, o
         logger.info("Loaded config snapshot: %d keys", len(snapshot))
         return snapshot
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as e:
-        raise FileNotFoundError(f"Config snapshot not found: gs://{execution_store_bucket}/{blob_path}") from e
+        raise FileNotFoundError(f"Config snapshot not found: gs://{execution_store_bucket}/{blob_path}") from e  # noqa: gs-uri — error message, not a URI constructor
 
 
 def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageReport:
@@ -91,17 +91,17 @@ def run_stage0(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
     # Check execution config snapshot
     config_blob = _EXPECTED_OUTPUTS["execution-config-snapshot"].format(date=date)
     if not _blob_exists(config.execution_store_bucket, config_blob):
-        missing.append(f"execution config snapshot: gs://{config.execution_store_bucket}/{config_blob}")
+        missing.append(f"execution config snapshot: gs://{config.execution_store_bucket}/{config_blob}")  # noqa: gs-uri — error message, not a URI constructor
 
     # Check ML outputs
     ml_blob = _EXPECTED_OUTPUTS["ml-inference"].format(date=date)
     if not _blob_exists(config.recon_bucket, ml_blob):
-        missing.append(f"ML t1-recon outputs: gs://{config.recon_bucket}/{ml_blob}")
+        missing.append(f"ML t1-recon outputs: gs://{config.recon_bucket}/{ml_blob}")  # noqa: gs-uri — error message, not a URI constructor
 
     # Check strategy outputs
     strategy_blob = _EXPECTED_OUTPUTS["strategy"].format(date=date)
     if not _blob_exists(config.recon_bucket, strategy_blob):
-        missing.append(f"strategy t1-recon outputs: gs://{config.recon_bucket}/{strategy_blob}")
+        missing.append(f"strategy t1-recon outputs: gs://{config.recon_bucket}/{strategy_blob}")  # noqa: gs-uri — error message, not a URI constructor
 
     if missing:
         error_msg = f"Missing upstream data for {date}: {'; '.join(missing)}"

@@ -123,7 +123,7 @@ def _count_blobs_and_rows(bucket_name: str, prefix: str) -> _BlobStats:
         bucket_obj = client.bucket(bucket_name)
         blobs = list(bucket_obj.list_blobs(prefix=prefix))
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as exc:
-        msg = f"Error listing gs://{bucket_name}/{prefix}: {exc}"
+        msg = f"Error listing gs://{bucket_name}/{prefix}: {exc}"  # noqa: gs-uri — error message, not a URI constructor
         logger.warning("%s", msg)
         stats.errors.append(msg)
         return stats
@@ -144,7 +144,7 @@ def _count_blobs_and_rows(bucket_name: str, prefix: str) -> _BlobStats:
                 if not stats.sample_rows:
                     stats.sample_rows = _parse_parquet_sample(raw)
             except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as exc:
-                msg = f"Error reading parquet gs://{bucket_name}/{blob_name}: {exc}"
+                msg = f"Error reading parquet gs://{bucket_name}/{blob_name}: {exc}"  # noqa: gs-uri — error message, not a URI constructor
                 logger.warning("%s", msg)
                 stats.errors.append(msg)
                 stats.row_count += 1  # count file itself as minimum
@@ -154,7 +154,7 @@ def _count_blobs_and_rows(bucket_name: str, prefix: str) -> _BlobStats:
                 line_count = sum(1 for line in raw.decode("utf-8").splitlines() if line.strip())
                 stats.row_count += line_count
             except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as exc:
-                msg = f"Error reading ndjson gs://{bucket_name}/{blob_name}: {exc}"
+                msg = f"Error reading ndjson gs://{bucket_name}/{blob_name}: {exc}"  # noqa: gs-uri — error message, not a URI constructor
                 logger.warning("%s", msg)
                 stats.errors.append(msg)
                 stats.row_count += 1
