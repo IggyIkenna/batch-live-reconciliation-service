@@ -17,7 +17,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from unified_api_contracts.canonical.crosscutting.alerting.thresholds import RECON_GREEN_THRESHOLDS
+from unified_api_contracts.alerting import RECON_GREEN_THRESHOLDS
 from unified_trading_library import GCSEventSink, log_event, setup_events
 
 from batch_live_reconciliation_service.config import ReconConfig, get_recon_config
