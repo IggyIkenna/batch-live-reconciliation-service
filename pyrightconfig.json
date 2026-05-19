@@ -1,5 +1,8 @@
 {
-  "include": ["batch_live_reconciliation_service", "tests"],
+  "include": [
+    "batch_live_reconciliation_service",
+    "tests"
+  ],
   "exclude": [
     "batch_live_reconciliation_service/stages/stage0_data_pipeline_recon.py",
     "tests",
@@ -7,11 +10,12 @@
     "dist",
     "*.egg-info",
     ".eggs",
-    "__pycache__",
+    "**/__pycache__",
     ".pytest_cache",
     ".ruff_cache",
-    ".venv",
-    ".venv.backup"
+    ".venv*",
+    ".venv.backup",
+    "node_modules"
   ],
   "typeCheckingMode": "strict",
   "reportMissingImports": "error",
