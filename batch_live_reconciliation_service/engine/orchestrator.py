@@ -17,6 +17,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
+from unified_api_contracts.canonical.crosscutting.alerting.thresholds import RECON_GREEN_THRESHOLDS
 from unified_trading_library import GCSEventSink, log_event, setup_events
 
 from batch_live_reconciliation_service.config import ReconConfig, get_recon_config
@@ -105,6 +106,26 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
     # Stage 3: Execution reconciliation
     s3 = run_stage3(config, date, dry_run=dry_run)
     report.stages.append(s3)
+
+    # Emit BATCH_VS_LIVE_RECON_DRIFTED when batch-vs-live P&L delta exceeds UAC green-band
+    # threshold. RECON_GREEN_THRESHOLDS["archetype"]["bps_delta_max"] is the operator-calibrated
+    # per-archetype gate (e.g. carry_staked_basis: 50 bps; leveraged_funding_arb: 75 bps).
+    alpha_pnl_gap = s3.metrics.get("alpha_pnl_gap", 0.0)
+    alpha_pnl_gap_bps = alpha_pnl_gap * 10_000
+    for archetype, thresholds in RECON_GREEN_THRESHOLDS.items():
+        bps_max = float(thresholds["bps_delta_max"])
+        if alpha_pnl_gap_bps > bps_max:
+            log_event(
+                "BATCH_VS_LIVE_RECON_DRIFTED",
+                details={
+                    "date": date,
+                    "run_id": run_id,
+                    "archetype": archetype,
+                    "alpha_pnl_gap_bps": alpha_pnl_gap_bps,
+                    "threshold_bps": bps_max,
+                    "routing": "ALERT",
+                },
+            )
 
     # Stage 3b: Paper-vs-live reconciliation (pvl-p21a)
     s3b = run_stage3b(config, date, dry_run=dry_run)
