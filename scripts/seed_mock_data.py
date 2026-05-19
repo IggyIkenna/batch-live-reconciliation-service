@@ -349,9 +349,7 @@ def _build_recon_report(
                 "actual_value": ml_direction_match,
                 "threshold": 0.95,
                 "direction": "below",
-                "description": (
-                    f"Signal direction match rate {ml_direction_match:.1%} < 95% threshold"
-                ),
+                "description": (f"Signal direction match rate {ml_direction_match:.1%} < 95% threshold"),
             }
         )
     if ml_mae > 0.1:
@@ -524,12 +522,8 @@ def generate_recon_data(
     )
 
     ml_batch, ml_live = _generate_ml_events(counts["ml_events"], rng, date_str, scenario)
-    strat_batch, strat_live = _generate_strategy_events(
-        counts["strategy_events"], rng, date_str, scenario
-    )
-    exec_batch, exec_live = _generate_execution_events(
-        counts["execution_events"], rng, date_str, scenario
-    )
+    strat_batch, strat_live = _generate_strategy_events(counts["strategy_events"], rng, date_str, scenario)
+    exec_batch, exec_live = _generate_execution_events(counts["execution_events"], rng, date_str, scenario)
 
     report = _build_recon_report(
         date_str,
