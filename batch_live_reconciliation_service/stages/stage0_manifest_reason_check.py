@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+import pandas as pd
 from unified_trading_library import CaptureStatus, read_availability_index
 
 from batch_live_reconciliation_service.models.recon_report import (
@@ -48,16 +49,12 @@ class _ManifestSidePair:
     live_reason: str
 
 
-def _get_sides(manifest_df: object, date_str: str) -> _ManifestSidePair:
+def _get_sides(manifest_df: pd.DataFrame, date_str: str) -> _ManifestSidePair:
     """Extract batch and live rows for one date from a manifest DataFrame."""
-    import pandas as pd
-
-    df: pd.DataFrame = manifest_df  # type: ignore[assignment]
-
-    date_rows = df[df["date"].astype(str) == date_str]
+    date_rows = manifest_df[manifest_df["date"].astype(str) == date_str]
 
     def _extract(mode: str) -> tuple[str, str]:
-        if "pipeline_mode" in df.columns:
+        if "pipeline_mode" in manifest_df.columns:
             rows = date_rows[date_rows["pipeline_mode"] == mode]
         else:
             # Manifest pre-v8 or no pipeline_mode column — treat as absent.
