@@ -18,7 +18,7 @@ import uuid
 from datetime import UTC, datetime
 
 from unified_api_contracts.alerting import RECON_GREEN_THRESHOLDS
-from unified_trading_library import GCSEventSink, log_event, setup_events
+from unified_trading_library import GCSEventSink, log_event, run_lifecycle, setup_events
 
 from batch_live_reconciliation_service.config import ReconConfig, get_recon_config
 from batch_live_reconciliation_service.models.deviation_thresholds import PAPER_LIVE_THRESHOLDS
@@ -70,7 +70,6 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
     run_id = str(uuid.uuid4())
     started_at = datetime.now(UTC)
 
-    log_event("STARTED", details={"date": date, "run_id": run_id, "dry_run": dry_run})
     logger.info("T+1 reconciliation starting: date=%s run_id=%s dry_run=%s", date, run_id, dry_run)
 
     report = ReconReport(
@@ -80,118 +79,116 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
         status=ReconStatus.RUNNING,
     )
 
-    # Stage 0: Config + availability check
-    s0 = run_stage0(config, date, dry_run=dry_run)
-    report.stages.append(s0)
+    try:
+        with run_lifecycle(
+            service_name=_SERVICE_NAME,
+            details={"date": date, "run_id": run_id, "dry_run": dry_run},
+        ) as run:
+            # Stage 0: Config + availability check
+            s0 = run_stage0(config, date, dry_run=dry_run)
+            report.stages.append(s0)
 
-    if s0.status == ReconStatus.FAILED:
-        report.status = ReconStatus.FAILED
-        report.completed_at = datetime.now(UTC)
-        logger.error("Stage 0 failed — aborting pipeline")
-        log_event("FAILED", details={"date": date, "stage": "stage0", "reason": s0.error_message})
-        return report
+            if s0.status == ReconStatus.FAILED:
+                report.status = ReconStatus.FAILED
+                report.completed_at = datetime.now(UTC)
+                logger.error("Stage 0 failed — aborting pipeline")
+                raise RuntimeError(f"stage0: {s0.error_message}")
 
-    # Stage 0.5: Data pipeline reconciliation (instruments, MTDS, MDPS)
-    s0_data = run_data_pipeline_recon(config, date, dry_run=dry_run)
-    report.stages.append(s0_data)
+            # Stage 0.5: Data pipeline reconciliation (instruments, MTDS, MDPS)
+            s0_data = run_data_pipeline_recon(config, date, dry_run=dry_run)
+            report.stages.append(s0_data)
 
-    # Stage 1: ML reconciliation
-    s1 = run_stage1(config, date, dry_run=dry_run)
-    report.stages.append(s1)
+            # Stage 1: ML reconciliation
+            s1 = run_stage1(config, date, dry_run=dry_run)
+            report.stages.append(s1)
 
-    # Stage 2: Strategy reconciliation
-    s2 = run_stage2(config, date, dry_run=dry_run)
-    report.stages.append(s2)
+            # Stage 2: Strategy reconciliation
+            s2 = run_stage2(config, date, dry_run=dry_run)
+            report.stages.append(s2)
 
-    # Stage 3: Execution reconciliation
-    s3 = run_stage3(config, date, dry_run=dry_run)
-    report.stages.append(s3)
+            # Stage 3: Execution reconciliation
+            s3 = run_stage3(config, date, dry_run=dry_run)
+            report.stages.append(s3)
 
-    # Emit BATCH_VS_LIVE_RECON_DRIFTED when batch-vs-live P&L delta exceeds UAC green-band
-    # threshold. RECON_GREEN_THRESHOLDS["archetype"]["bps_delta_max"] is the operator-calibrated
-    # per-archetype gate (e.g. carry_staked_basis: 50 bps; leveraged_funding_arb: 75 bps).
-    alpha_pnl_gap = s3.metrics.get("alpha_pnl_gap", 0.0)
-    alpha_pnl_gap_bps = alpha_pnl_gap * 10_000
-    for archetype, thresholds in RECON_GREEN_THRESHOLDS.items():
-        bps_max = float(thresholds["bps_delta_max"])
-        if alpha_pnl_gap_bps > bps_max:
-            log_event(
-                "BATCH_VS_LIVE_RECON_DRIFTED",
-                details={
-                    "date": date,
-                    "run_id": run_id,
-                    "archetype": archetype,
-                    "alpha_pnl_gap_bps": alpha_pnl_gap_bps,
-                    "threshold_bps": bps_max,
-                    "routing": "ALERT",
-                },
+            # Emit BATCH_VS_LIVE_RECON_DRIFTED when batch-vs-live P&L delta exceeds UAC green-band
+            # threshold. RECON_GREEN_THRESHOLDS["archetype"]["bps_delta_max"] is the operator-calibrated
+            # per-archetype gate (e.g. carry_staked_basis: 50 bps; leveraged_funding_arb: 75 bps).
+            alpha_pnl_gap = s3.metrics.get("alpha_pnl_gap", 0.0)
+            alpha_pnl_gap_bps = alpha_pnl_gap * 10_000
+            for archetype, thresholds in RECON_GREEN_THRESHOLDS.items():
+                bps_max = float(thresholds["bps_delta_max"])
+                if alpha_pnl_gap_bps > bps_max:
+                    log_event(
+                        "BATCH_VS_LIVE_RECON_DRIFTED",
+                        details={
+                            "date": date,
+                            "run_id": run_id,
+                            "archetype": archetype,
+                            "alpha_pnl_gap_bps": alpha_pnl_gap_bps,
+                            "threshold_bps": bps_max,
+                            "routing": "ALERT",
+                        },
+                    )
+
+            # Stage 3b: Paper-vs-live reconciliation (pvl-p21a)
+            s3b = run_stage3b(config, date, dry_run=dry_run)
+            report.stages.append(s3b)
+
+            # Emit BATCH_LIVE_RECON_DRIFT when paper-vs-live slippage exceeds 5bps threshold.
+            # Alerting-service hooks this event for Telegram + PagerDuty routing.
+            slippage_bps = s3b.metrics.get("slippage_delta_bps", 0.0)
+            if slippage_bps > PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max:
+                log_event(
+                    "BATCH_LIVE_RECON_DRIFT",
+                    details={
+                        "date": date,
+                        "run_id": run_id,
+                        "slippage_delta_bps": slippage_bps,
+                        "threshold_bps": PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max,
+                        "stage3b_deviations": len(s3b.deviations),
+                        "routing": "ALERT_AND_AUTO_DEMOTE",
+                    },
+                )
+
+            # Stage 3c: Batch-vs-paper reconciliation
+            s3c = run_stage3c(config, date, dry_run=dry_run)
+            report.stages.append(s3c)
+
+            # Stage 4: Agent analysis (uses results from data pipeline + stages 1-3b-3c)
+            s4 = run_stage4(config, date, stage_reports=[s0_data, s1, s2, s3, s3b, s3c], dry_run=dry_run)
+            report.stages.append(s4)
+            if s4.output_gcs_path:
+                report.agent_report_gcs_path = s4.output_gcs_path
+
+            # Determine overall status
+            failed_stages = [s for s in report.stages if s.status == ReconStatus.FAILED]
+            report.status = ReconStatus.FAILED if failed_stages else ReconStatus.PASSED
+
+            # Stage 5: Write consolidated results
+            s5 = run_stage5(config, report, dry_run=dry_run)
+            report.stages.append(s5)
+            if s5.output_gcs_path:
+                report.summary_gcs_path = s5.output_gcs_path
+
+            report.completed_at = datetime.now(UTC)
+
+            total_deviations = report.total_deviations
+            logger.info(
+                "T+1 reconciliation complete: date=%s status=%s total_deviations=%d",
+                date,
+                report.status.value,
+                total_deviations,
             )
 
-    # Stage 3b: Paper-vs-live reconciliation (pvl-p21a)
-    s3b = run_stage3b(config, date, dry_run=dry_run)
-    report.stages.append(s3b)
+            if report.status == ReconStatus.FAILED:
+                failed_stages_str = ", ".join(s.value for s in report.failed_stages)
+                run.update(total_deviations=total_deviations, failed_stages=failed_stages_str)
+                raise RuntimeError(f"pipeline failed: stages={failed_stages_str}")
 
-    # Emit BATCH_LIVE_RECON_DRIFT when paper-vs-live slippage exceeds 5bps threshold.
-    # Alerting-service hooks this event for Telegram + PagerDuty routing.
-    slippage_bps = s3b.metrics.get("slippage_delta_bps", 0.0)
-    if slippage_bps > PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max:
-        log_event(
-            "BATCH_LIVE_RECON_DRIFT",
-            details={
-                "date": date,
-                "run_id": run_id,
-                "slippage_delta_bps": slippage_bps,
-                "threshold_bps": PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max,
-                "stage3b_deviations": len(s3b.deviations),
-                "routing": "ALERT_AND_AUTO_DEMOTE",
-            },
-        )
+            run.update(total_deviations=total_deviations)
 
-    # Stage 3c: Batch-vs-paper reconciliation
-    s3c = run_stage3c(config, date, dry_run=dry_run)
-    report.stages.append(s3c)
-
-    # Stage 4: Agent analysis (uses results from data pipeline + stages 1-3b-3c)
-    s4 = run_stage4(config, date, stage_reports=[s0_data, s1, s2, s3, s3b, s3c], dry_run=dry_run)
-    report.stages.append(s4)
-    if s4.output_gcs_path:
-        report.agent_report_gcs_path = s4.output_gcs_path
-
-    # Determine overall status
-    failed_stages = [s for s in report.stages if s.status == ReconStatus.FAILED]
-    report.status = ReconStatus.FAILED if failed_stages else ReconStatus.PASSED
-
-    # Stage 5: Write consolidated results
-    s5 = run_stage5(config, report, dry_run=dry_run)
-    report.stages.append(s5)
-    if s5.output_gcs_path:
-        report.summary_gcs_path = s5.output_gcs_path
-
-    report.completed_at = datetime.now(UTC)
-
-    total_deviations = report.total_deviations
-    logger.info(
-        "T+1 reconciliation complete: date=%s status=%s total_deviations=%d",
-        date,
-        report.status.value,
-        total_deviations,
-    )
-
-    if report.status == ReconStatus.PASSED:
-        log_event(
-            "STOPPED",
-            details={"date": date, "run_id": run_id, "total_deviations": total_deviations},
-        )
-    else:
-        failed_stages_str = ", ".join(s.value for s in report.failed_stages)
-        log_event(
-            "FAILED",
-            details={
-                "date": date,
-                "run_id": run_id,
-                "total_deviations": total_deviations,
-                "failed_stages": failed_stages_str,
-            },
-        )
+    except RuntimeError:
+        if report.completed_at is None:
+            report.completed_at = datetime.now(UTC)
 
     return report
