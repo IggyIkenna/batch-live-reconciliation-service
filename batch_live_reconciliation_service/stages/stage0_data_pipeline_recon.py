@@ -35,6 +35,9 @@ from batch_live_reconciliation_service.models.recon_report import (
     ReconStatus,
     StageReport,
 )
+from batch_live_reconciliation_service.stages.stage0_manifest_reason_check import (
+    check_manifest_reason_agreement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -467,6 +470,40 @@ def run_data_pipeline_recon(config: ReconConfig, date: str, dry_run: bool = Fals
     }
 
     deviations = _check_deviations(results)
+
+    # Manifest reason agreement: for each service+category bucket with batch data,
+    # compare batch vs live capture_status + error_reason for the given date.
+    # Fails open on any error (network, auth, manifest absent) — never raises.
+    checked_buckets: set[str] = set()
+    for service_name, bucket_attr_prefix, _, _ in _DATA_PIPELINE_SERVICES:
+        for category in _CATEGORIES:
+            bucket = _get_bucket_for_service(config, bucket_attr_prefix, category)
+            if not bucket or bucket in checked_buckets:
+                continue
+            checked_buckets.add(bucket)
+            try:
+                manifest_deviations = check_manifest_reason_agreement(
+                    bucket=bucket,
+                    dates=[date],
+                    asset_group=category,
+                )
+            except Exception as exc:  # noqa: BLE001 — manifest check is fail-open; network/auth errors skip silently
+                logger.warning(
+                    "[Data Pipeline Recon] manifest check failed for %s/%s — skipping: %s",
+                    service_name,
+                    category,
+                    exc,
+                )
+                continue
+            if manifest_deviations:
+                logger.warning(
+                    "[Data Pipeline Recon] %d manifest reason deviation(s) for %s/%s",
+                    len(manifest_deviations),
+                    service_name,
+                    category,
+                )
+            deviations.extend(manifest_deviations)
+
     status = ReconStatus.PASSED if not deviations else ReconStatus.FAILED
 
     if deviations:

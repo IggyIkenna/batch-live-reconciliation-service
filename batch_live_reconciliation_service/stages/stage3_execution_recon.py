@@ -74,7 +74,7 @@ def _compute_metrics(
     live_fills = fills(live_events)
     batch_fills = fills(batch_events)
 
-    # Alpha P&L gap: live fills P&L - batch fills P&L
+    # Alpha P&L gap: live fills P&L - batch fills P&L (aggregate)
     live_pnl = sum(
         float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0))) for e in live_fills
     )
@@ -83,6 +83,23 @@ def _compute_metrics(
     )
     notional = abs(live_pnl) or 1.0
     alpha_gap = abs(live_pnl - batch_pnl) / notional
+
+    # Per-archetype P&L gap in bps — consumed by orchestrator for RECON_GREEN_THRESHOLDS check.
+    # Events carry optional `archetype` field; unknown/absent archetype is skipped.
+    per_archetype_bps: dict[str, float] = {}
+    for archetype in set(str(e["archetype"]) for evs in (live_fills, batch_fills) for e in evs if e.get("archetype")):
+        arc_live_pnl = sum(
+            float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
+            for e in live_fills
+            if e.get("archetype") == archetype
+        )
+        arc_batch_pnl = sum(
+            float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
+            for e in batch_fills
+            if e.get("archetype") == archetype
+        )
+        arc_notional = abs(arc_live_pnl) or 1.0
+        per_archetype_bps[archetype] = abs(arc_live_pnl - arc_batch_pnl) / arc_notional * 10_000
 
     # Fill rate: filled orders / submitted orders
     live_submitted = sum(1 for e in live_events if e.get("event_type") == "ORDER_SUBMITTED")
@@ -108,7 +125,7 @@ def _compute_metrics(
     latencies.sort()
     p99_latency = latencies[int(len(latencies) * 0.99)] if latencies else 0.0
 
-    return {
+    metrics: dict[str, float] = {
         "alpha_pnl_gap": alpha_gap,
         "fill_rate_delta": fill_rate_delta,
         "slippage_delta_bps": slippage_delta,
@@ -117,6 +134,9 @@ def _compute_metrics(
         "batch_fill_count": float(len(batch_fills)),
         "live_fill_count": float(len(live_fills)),
     }
+    for archetype, bps_val in per_archetype_bps.items():
+        metrics[f"alpha_pnl_gap_bps_{archetype}"] = bps_val
+    return metrics
 
 
 def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
