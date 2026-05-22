@@ -5,6 +5,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY batch_live_reconciliation_service/ ./batch_live_reconciliation_service/
+COPY scripts/ ./scripts/
 
 # --no-deps: UTL base image pre-installs unified-trading-library and
 # unified-api-contracts; avoids needing local path deps in build context.
