@@ -6,6 +6,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY batch_live_reconciliation_service/ ./batch_live_reconciliation_service/
 
-RUN uv sync --frozen --no-dev --system
+# --no-deps: UTL base image pre-installs unified-trading-library and
+# unified-api-contracts; avoids needing local path deps in build context.
+RUN uv pip install --system -e . --no-deps
 
 ENTRYPOINT ["python", "-m", "batch_live_reconciliation_service"]
