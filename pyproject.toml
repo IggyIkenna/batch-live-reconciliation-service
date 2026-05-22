@@ -60,6 +60,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["batch_live_reconciliation_service"]
+known-third-party = ["unified_trading_library", "unified_api_contracts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
