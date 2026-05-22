@@ -17,7 +17,11 @@ LOCAL_DEPS=()
 # to avoid pulling the heavy pyarrow dep at module import (only needed for recon).
 IMPORT_INSIDE_EXCLUDE_GLOBS=("!**/stages/stage0_data_pipeline_recon.py")
 CODEX_MAX_VIOLATIONS=1  # pre-existing pip-audit advisory; no upstream fix available
-WORKSPACE_ROOT="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"
+if [ "${CLOUD_BUILD:-}" = "true" ] && [ -d "/workspace/unified-trading-pm" ]; then
+    WORKSPACE_ROOT="/workspace"
+else
+    WORKSPACE_ROOT="$(cd "$(git rev-parse --show-toplevel)/.." && pwd)"
+fi
 source "${WORKSPACE_ROOT}/unified-trading-pm/scripts/quality-gates-base/base-service.sh"
 
 # Codex enforcement: lifecycle triple (STARTED / STOPPED / FAILED) via UTL — not duplicated in service code.

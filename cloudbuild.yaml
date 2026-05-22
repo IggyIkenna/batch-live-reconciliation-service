@@ -77,6 +77,24 @@ steps:
         echo "Building version $$VERSION"
     waitFor: ["-"]
 
+  # ── Clone unified-trading-pm for quality-gates WORKSPACE_ROOT resolution ──────
+  # quality-gates.sh sources base-service.sh from WORKSPACE_ROOT/unified-trading-pm;
+  # when CLOUD_BUILD=true, WORKSPACE_ROOT=/workspace; clone pm here so it exists.
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:alpine"
+    id: "clone-deps"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -e
+        GH_PAT=$$(gcloud secrets versions access latest --secret=GH_PAT --project=$PROJECT_ID 2>/dev/null || echo "")
+        if [ -z "$$GH_PAT" ]; then
+          echo "FAIL: GH_PAT not configured — cannot clone unified-trading-pm"; exit 1
+        fi
+        git clone --depth=1 https://$$GH_PAT@github.com/IggyIkenna/unified-trading-pm.git unified-trading-pm
+        echo "unified-trading-pm cloned OK"
+    waitFor: ["-"]
+
   # ── STEP 1: Configure Docker authentication ───────────────────────────────
   - name: "gcr.io/cloud-builders/gcloud"
     id: "configure-docker"
@@ -125,7 +143,7 @@ steps:
           -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
           -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:latest \
           .
-    waitFor: ["pull-base-image", "ensure-repo", "extract-version"]
+    waitFor: ["pull-base-image", "ensure-repo", "extract-version", "clone-deps"]
 
   # ── STEP 5: REQUIRED — Run quality gates INSIDE the image ─────────────────
   # CRITICAL: Use --entrypoint "" to clear the image's default ENTRYPOINT.
@@ -145,6 +163,8 @@ steps:
           -e CLOUD_BUILD=true \
           -e CLOUD_MOCK_MODE=true \
           -e GCP_PROJECT_ID=$PROJECT_ID \
+          -e WORKSPACE_ROOT=/workspace \
+          -v /workspace:/workspace:ro \
           asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
           /bin/bash -c "scripts/quality-gates.sh --no-fix --quick"
     waitFor: ["build"]
