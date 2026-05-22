@@ -92,7 +92,7 @@ steps:
           echo "FAIL: GH_PAT not configured — cannot clone unified-trading-pm"; exit 1
         fi
         git clone --depth=1 --branch live-defi-rollout https://$$GH_PAT@github.com/IggyIkenna/unified-trading-pm.git unified-trading-pm
-        git clone --depth=1 https://$$GH_PAT@github.com/IggyIkenna/deployment-service.git deployment-service
+        git clone --depth=1 --branch live-defi-rollout https://$$GH_PAT@github.com/IggyIkenna/deployment-service.git deployment-service
         echo "unified-trading-pm + deployment-service cloned OK"
     waitFor: ["-"]
 
@@ -166,6 +166,7 @@ steps:
           -e GCP_PROJECT_ID=$PROJECT_ID \
           -e WORKSPACE_ROOT=/workspace \
           -e RUFF_CACHE_DIR=/tmp/ruff_cache \
+          -e DEPLOYMENT_ENV_SHORT=prod \
           -e UNIFIED_TRADING_CLOUD_PROVIDERS_YAML=/workspace/deployment-service/configs/cloud-providers.yaml \
           -v /workspace:/workspace:ro \
           asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
