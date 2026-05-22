@@ -91,7 +91,7 @@ steps:
         if [ -z "$$GH_PAT" ]; then
           echo "FAIL: GH_PAT not configured — cannot clone unified-trading-pm"; exit 1
         fi
-        git clone --depth=1 https://$$GH_PAT@github.com/IggyIkenna/unified-trading-pm.git unified-trading-pm
+        git clone --depth=1 --branch live-defi-rollout https://$$GH_PAT@github.com/IggyIkenna/unified-trading-pm.git unified-trading-pm
         echo "unified-trading-pm cloned OK"
     waitFor: ["-"]
 
