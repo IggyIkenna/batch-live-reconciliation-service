@@ -1,0 +1,18 @@
+# Exclude dangling symlinks (point to ../unified-trading-pm/ which is outside repo)
+# gcloud builds submit fails when archiving symlinks with non-existent targets.
+.gitleaks.toml
+.claude/
+.cursor/
+scripts/quickmerge.sh
+scripts/pre-flight-audit.sh
+
+# Exclude large dirs not needed in the Cloud Build source tarball
+.venv/
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+.coverage
+coverage.xml
