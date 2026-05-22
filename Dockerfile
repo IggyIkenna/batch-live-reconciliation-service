@@ -1,12 +1,13 @@
 ARG PROJECT_ID
 FROM --platform=linux/amd64 asia-northeast1-docker.pkg.dev/${PROJECT_ID}/unified-trading-library/unified-trading-library:latest
 
-WORKDIR /app
+WORKDIR /app/batch-live-reconciliation-service
 
 COPY pyproject.toml uv.lock ./
 COPY batch_live_reconciliation_service/ ./batch_live_reconciliation_service/
 COPY scripts/ ./scripts/
 COPY tests/ ./tests/
+COPY cloudbuild.yaml ./
 
 # --no-deps: UTL base image pre-installs unified-trading-library and
 # unified-api-contracts; avoids needing local path deps in build context.
