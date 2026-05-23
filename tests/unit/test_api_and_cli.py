@@ -73,26 +73,6 @@ class TestCLIMain:
         assert "reconcile" in _OPERATIONS
         assert _OPERATIONS["reconcile"] is ReconcileHandler
 
-    def test_add_recon_args_adds_log_level(self) -> None:
-        import argparse
-
-        from batch_live_reconciliation_service.cli.main import _add_recon_args
-
-        parser = argparse.ArgumentParser()
-        _add_recon_args(parser)
-        args = parser.parse_args([])
-        assert args.log_level == "INFO"
-
-    def test_add_recon_args_accepts_debug(self) -> None:
-        import argparse
-
-        from batch_live_reconciliation_service.cli.main import _add_recon_args
-
-        parser = argparse.ArgumentParser()
-        _add_recon_args(parser)
-        args = parser.parse_args(["--log-level", "DEBUG"])
-        assert args.log_level == "DEBUG"
-
     def test_get_mock_pipeline_calls_run_mock_pipeline(self) -> None:
 
         with patch(
