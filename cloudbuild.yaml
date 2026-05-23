@@ -39,7 +39,6 @@
 substitutions:
   _SERVICE_NAME: "batch-live-reconciliation-service"
   _REGISTRY_REPO: "unified-trading-system"
-  _PKG_NAME: "batch_live_reconciliation_service"
 
 steps:
   # ── Auth pre-check: fail fast if SA lacks AR access (before expensive build) ─
