@@ -25,6 +25,7 @@ import logging
 from dataclasses import dataclass
 
 import pandas as pd
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import CaptureStatus, read_availability_index
 
 from batch_live_reconciliation_service.models.recon_report import (
@@ -172,13 +173,14 @@ def check_manifest_reason_agreement(
             flag = _flag_pair(pair)
             if flag is not None:
                 deviations.append(
-                    DeviationRecord(
+                    DeviationRecord.new(
                         metric_name="manifest_reason_disagreement",
                         stage=ReconStage.DATA_PIPELINE_RECON,
                         actual_value=1.0,
                         threshold=0.0,
                         direction="above",
                         description=f"[{asset_group}] {flag}",
+                        dimension=ReconciliationDimension.ACCOUNT_LEVEL_AGGREGATE,
                     )
                 )
         except (KeyError, ValueError, TypeError, IndexError) as exc:

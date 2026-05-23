@@ -20,6 +20,7 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
@@ -135,7 +136,7 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
 
     if metrics["instruction_alignment_pct"] < t.instruction_alignment_pct_min:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="instruction_alignment_pct",
                 stage=ReconStage.STRATEGY_RECON,
                 actual_value=metrics["instruction_alignment_pct"],
@@ -145,12 +146,13 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Instruction alignment {metrics['instruction_alignment_pct']:.1%} "
                     f"< {t.instruction_alignment_pct_min:.0%}"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
     if metrics["benchmark_pnl_delta"] > t.benchmark_pnl_delta_max:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="benchmark_pnl_delta",
                 stage=ReconStage.STRATEGY_RECON,
                 actual_value=metrics["benchmark_pnl_delta"],
@@ -160,12 +162,13 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Benchmark P&L delta {metrics['benchmark_pnl_delta']:.1%} "
                     f"> {t.benchmark_pnl_delta_max:.0%} of notional"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
     if metrics["position_snapshot_delta"] > t.position_snapshot_delta_max:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="position_snapshot_delta",
                 stage=ReconStage.STRATEGY_RECON,
                 actual_value=metrics["position_snapshot_delta"],
@@ -175,18 +178,20 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Max position delta {metrics['position_snapshot_delta']:.2f} "
                     f"> {t.position_snapshot_delta_max} units"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
     if metrics["var_delta_pct"] > t.var_delta_pct_max:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="var_delta_pct",
                 stage=ReconStage.STRATEGY_RECON,
                 actual_value=metrics["var_delta_pct"],
                 threshold=t.var_delta_pct_max,
                 direction="above",
                 description=(f"VaR delta {metrics['var_delta_pct']:.1%} > {t.var_delta_pct_max:.0%}"),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 

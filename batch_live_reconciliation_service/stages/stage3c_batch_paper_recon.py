@@ -21,6 +21,7 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
@@ -146,13 +147,14 @@ def _check_deviations(
     for name, actual, threshold, desc in checks:
         if actual > threshold:
             deviations.append(
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name=name,
                     stage=ReconStage.BATCH_PAPER_RECON,
                     actual_value=actual,
                     threshold=threshold,
                     direction="above",
                     description=desc,
+                    dimension=ReconciliationDimension.FILLS,
                 )
             )
 

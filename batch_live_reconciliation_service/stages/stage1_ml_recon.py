@@ -20,6 +20,7 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
@@ -115,7 +116,7 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
 
     if metrics["signal_direction_match_rate"] < t.signal_direction_match_rate_min:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="signal_direction_match_rate",
                 stage=ReconStage.ML_RECON,
                 actual_value=metrics["signal_direction_match_rate"],
@@ -125,12 +126,13 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Signal direction match rate {metrics['signal_direction_match_rate']:.1%} "
                     f"< {t.signal_direction_match_rate_min:.0%} threshold"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
     if metrics["signal_magnitude_mae"] > t.signal_magnitude_mae_max:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="signal_magnitude_mae",
                 stage=ReconStage.ML_RECON,
                 actual_value=metrics["signal_magnitude_mae"],
@@ -140,12 +142,13 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Signal magnitude MAE {metrics['signal_magnitude_mae']:.3f} "
                     f"> {t.signal_magnitude_mae_max} threshold"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
     if metrics["instrument_coverage_pct"] < t.instrument_coverage_pct_min:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="instrument_coverage_pct",
                 stage=ReconStage.ML_RECON,
                 actual_value=metrics["instrument_coverage_pct"],
@@ -155,12 +158,13 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Instrument coverage {metrics['instrument_coverage_pct']:.1%} "
                     f"< {t.instrument_coverage_pct_min:.0%} threshold"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
     if metrics["latency_delta_ms"] > t.latency_delta_ms_max:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="latency_delta_ms",
                 stage=ReconStage.ML_RECON,
                 actual_value=metrics["latency_delta_ms"],
@@ -170,6 +174,7 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Median latency delta {metrics['latency_delta_ms']:.0f}ms "
                     f"> {t.latency_delta_ms_max:.0f}ms threshold"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 

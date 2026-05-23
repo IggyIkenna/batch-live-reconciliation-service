@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import MockEventSink, setup_events
 
 # Initialize events for the test session (needed before any log_event calls)
@@ -232,13 +233,14 @@ class TestUnifiedTradingLibrary:
             started_at=datetime.now(UTC),
             completed_at=datetime.now(UTC),
             deviations=[
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name="sharpe_ratio",
                     stage=ReconStage.ML_RECON,
                     actual_value=1.5,
                     threshold=2.0,
                     direction="below",
                     description="Sharpe below threshold",
+                    dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
                 )
             ],
             metrics={"accuracy": 0.95},

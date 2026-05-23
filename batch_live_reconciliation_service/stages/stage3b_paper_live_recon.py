@@ -21,6 +21,7 @@ import logging
 from datetime import UTC, datetime
 from typing import NamedTuple, cast
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
@@ -163,13 +164,14 @@ def _check_deviations(
         if actual > threshold:
             results.append(
                 _PaperLiveDeviation(
-                    record=DeviationRecord(
+                    record=DeviationRecord.new(
                         metric_name=name,
                         stage=ReconStage.PAPER_LIVE_RECON,
                         actual_value=actual,
                         threshold=threshold,
                         direction="above",
                         description=desc,
+                        dimension=ReconciliationDimension.FILLS,
                     ),
                     routing_action=action,
                 )
@@ -179,13 +181,14 @@ def _check_deviations(
     if accuracy < t.algo_selection_accuracy_min:
         results.append(
             _PaperLiveDeviation(
-                record=DeviationRecord(
+                record=DeviationRecord.new(
                     metric_name="algo_selection_accuracy",
                     stage=ReconStage.PAPER_LIVE_RECON,
                     actual_value=accuracy,
                     threshold=t.algo_selection_accuracy_min,
                     direction="below",
                     description=(f"Paper algo selection accuracy {accuracy:.1%} < {t.algo_selection_accuracy_min:.0%}"),
+                    dimension=ReconciliationDimension.FILLS,
                 ),
                 routing_action=FailureRoutingAction.ALERT,
             )

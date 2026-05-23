@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from io import BytesIO
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event, reconcile_shard
 
 from batch_live_reconciliation_service.config import ReconConfig
@@ -288,7 +289,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 if not r.files_match
             ]
             deviations.append(
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name="file_count_match_rate",
                     stage=ReconStage.DATA_PIPELINE_RECON,
                     actual_value=file_match_rate,
@@ -299,6 +300,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                         f"< {t.file_count_match_rate_min:.0%} threshold. "
                         f"Mismatched: {', '.join(mismatched)}"
                     ),
+                    dimension=ReconciliationDimension.ACCOUNT_LEVEL_AGGREGATE,
                 )
             )
 
@@ -314,7 +316,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 if not r.rows_match
             ]
             deviations.append(
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name="row_count_match_rate",
                     stage=ReconStage.DATA_PIPELINE_RECON,
                     actual_value=row_match_rate,
@@ -325,6 +327,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                         f"< {t.row_count_match_rate_min:.0%} threshold. "
                         f"Mismatched: {', '.join(mismatched)}"
                     ),
+                    dimension=ReconciliationDimension.ACCOUNT_LEVEL_AGGREGATE,
                 )
             )
 
@@ -333,7 +336,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
     if len(missing_live) > t.missing_live_partition_max:
         missing_names = [f"{r.service_name}/{r.category}" for r in missing_live]
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="missing_live_partitions",
                 stage=ReconStage.DATA_PIPELINE_RECON,
                 actual_value=float(len(missing_live)),
@@ -342,6 +345,7 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
                 description=(
                     f"{len(missing_live)} service(s) have batch data but no live partition: {', '.join(missing_names)}"
                 ),
+                dimension=ReconciliationDimension.ACCOUNT_LEVEL_AGGREGATE,
             )
         )
 
@@ -350,13 +354,14 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
     if schema_mismatches:
         names = [f"{r.service_name}/{r.category}" for r in schema_mismatches]
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="shard_schema_mismatch",
                 stage=ReconStage.DATA_PIPELINE_RECON,
                 actual_value=float(len(schema_mismatches)),
                 threshold=0.0,
                 direction="above",
                 description=(f"{len(schema_mismatches)} service(s) have batch/live schema drift: {', '.join(names)}"),
+                dimension=ReconciliationDimension.ACCOUNT_LEVEL_AGGREGATE,
             )
         )
 
@@ -364,13 +369,14 @@ def _check_deviations(results: list[_ServiceReconResult]) -> list[DeviationRecor
     if value_mismatches:
         names = [f"{r.service_name}/{r.category}" for r in value_mismatches]
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="shard_value_mismatch",
                 stage=ReconStage.DATA_PIPELINE_RECON,
                 actual_value=float(len(value_mismatches)),
                 threshold=0.0,
                 direction="above",
                 description=(f"{len(value_mismatches)} service(s) have batch/live value drift: {', '.join(names)}"),
+                dimension=ReconciliationDimension.ACCOUNT_LEVEL_AGGREGATE,
             )
         )
 

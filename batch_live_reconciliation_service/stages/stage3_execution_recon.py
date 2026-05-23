@@ -21,6 +21,7 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
@@ -177,19 +178,20 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
     for name, actual, threshold, direction, desc in checks:
         if direction == "above" and actual > threshold:
             deviations.append(
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name=name,
                     stage=ReconStage.EXECUTION_RECON,
                     actual_value=actual,
                     threshold=threshold,
                     direction=direction,
                     description=desc,
+                    dimension=ReconciliationDimension.FILLS,
                 )
             )
 
     if metrics["algo_selection_accuracy"] < t.algo_selection_accuracy_min:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="algo_selection_accuracy",
                 stage=ReconStage.EXECUTION_RECON,
                 actual_value=metrics["algo_selection_accuracy"],
@@ -199,6 +201,7 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Algo selection accuracy {metrics['algo_selection_accuracy']:.1%} "
                     f"< {t.algo_selection_accuracy_min:.0%}"
                 ),
+                dimension=ReconciliationDimension.FILLS,
             )
         )
 

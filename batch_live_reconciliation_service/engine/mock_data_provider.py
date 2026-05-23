@@ -21,6 +21,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, cast
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
+
 from batch_live_reconciliation_service.models.deviation_thresholds import (
     EXECUTION_THRESHOLDS,
     ML_THRESHOLDS,
@@ -80,7 +82,7 @@ def _run_ml_recon(
     deviations: list[DeviationRecord] = []
     if match_rate < ML_THRESHOLDS.signal_direction_match_rate_min:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="signal_direction_match_rate",
                 stage=ReconStage.ML_RECON,
                 actual_value=match_rate,
@@ -90,6 +92,7 @@ def _run_ml_recon(
                     f"Signal direction match rate {match_rate:.2%}"
                     f" below threshold {ML_THRESHOLDS.signal_direction_match_rate_min:.2%}"
                 ),
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         )
 
@@ -113,7 +116,7 @@ def _run_execution_recon(
     deviations: list[DeviationRecord] = []
     if avg_slippage > EXECUTION_THRESHOLDS.slippage_delta_bps_max:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="avg_slippage_bps",
                 stage=ReconStage.EXECUTION_RECON,
                 actual_value=avg_slippage,
@@ -123,6 +126,7 @@ def _run_execution_recon(
                     f"Average slippage {avg_slippage:.1f} bps exceeds"
                     f" threshold {EXECUTION_THRESHOLDS.slippage_delta_bps_max:.1f} bps"
                 ),
+                dimension=ReconciliationDimension.FILLS,
             )
         )
 
