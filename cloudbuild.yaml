@@ -139,6 +139,10 @@ steps:
       - "-c"
       - |
         VERSION=$(cat /workspace/VERSION 2>/dev/null || echo "$SHORT_SHA")
+        # Bundle cloud-providers.yaml so the container can resolve bucket names
+        # without a workspace (UNIFIED_TRADING_CLOUD_PROVIDERS_YAML set in Dockerfile).
+        mkdir -p configs
+        cp /workspace/deployment-service/configs/cloud-providers.yaml configs/cloud-providers.yaml
         docker build -f Dockerfile \
           --build-arg PROJECT_ID=$PROJECT_ID \
           -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
