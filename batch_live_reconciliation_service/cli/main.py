@@ -14,7 +14,6 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
 import logging
 
 from unified_trading_library import BaseModeHandler, ServiceBootstrap, UnifiedServiceHandler
@@ -23,17 +22,6 @@ from batch_live_reconciliation_service.cli.handlers.reconcile_handler import Rec
 from batch_live_reconciliation_service.engine.mock_data_provider import run_mock_pipeline
 
 logger = logging.getLogger(__name__)
-
-
-def _add_recon_args(parser: argparse.ArgumentParser) -> None:
-    """Add reconciliation-specific CLI arguments."""
-    _ = parser.add_argument(
-        "--log-level",
-        type=str,
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level (default: INFO)",
-    )
 
 
 _OPERATIONS: dict[str, type[BaseModeHandler] | type[UnifiedServiceHandler]] = {
@@ -59,7 +47,6 @@ def main() -> None:
         modes=["batch"],
         description=("T+1 Batch-Live Reconciliation -- nightly pipeline replay and deviation analysis"),
         add_asset_group_arg=False,
-        extra_args_fn=_add_recon_args,
         mock_pipeline_fn=_get_mock_pipeline,
     ).run()
 
