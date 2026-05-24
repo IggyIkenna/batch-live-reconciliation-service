@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 import pandas as pd
 from unified_api_contracts.internal.reconciliation import ReconciliationDimension
@@ -62,8 +63,8 @@ def _get_sides(manifest_df: pd.DataFrame, date_str: str) -> _ManifestSidePair:
             return "absent", ""
         if rows.empty:
             return "absent", ""
-        status = str(rows["capture_status"].iloc[0])
-        reason = str(rows["error_reason"].iloc[0]) if "error_reason" in rows.columns else ""
+        status = str(cast(object, rows["capture_status"].iloc[0]))
+        reason = str(cast(object, rows["error_reason"].iloc[0])) if "error_reason" in rows.columns else ""
         return status, reason
 
     batch_status, batch_reason = _extract(_PIPELINE_MODE_BATCH)

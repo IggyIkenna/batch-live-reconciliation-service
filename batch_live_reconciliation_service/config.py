@@ -7,7 +7,7 @@ Uses UnifiedCloudConfig (no os.getenv() per workspace standards).
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import override
+from typing import Literal, cast, override
 
 from unified_trading_library import CloudProvider, UnifiedCloudConfig, get_cloud_provider, resolve_bucket_name
 
@@ -52,29 +52,30 @@ class ReconConfig(UnifiedCloudConfig):
         # Skip in local mode: resolve_bucket_name only accepts "gcp" / "aws".
         cloud = get_cloud_provider()
         if cloud != CloudProvider.LOCAL:
+            cloud_name = cast(Literal["gcp", "aws"], cloud)
             if not self.instruments_bucket_cefi:
                 self.instruments_bucket_cefi = resolve_bucket_name(
-                    cloud=cloud, kind="instruments-store", asset_group="cefi"
+                    cloud=cloud_name, kind="instruments-store", asset_group="cefi"
                 )
             if not self.instruments_bucket_tradfi:
                 self.instruments_bucket_tradfi = resolve_bucket_name(
-                    cloud=cloud, kind="instruments-store", asset_group="tradfi"
+                    cloud=cloud_name, kind="instruments-store", asset_group="tradfi"
                 )
             if not self.instruments_bucket_defi:
                 self.instruments_bucket_defi = resolve_bucket_name(
-                    cloud=cloud, kind="instruments-store", asset_group="defi"
+                    cloud=cloud_name, kind="instruments-store", asset_group="defi"
                 )
             if not self.market_data_tick_bucket_cefi:
                 self.market_data_tick_bucket_cefi = resolve_bucket_name(
-                    cloud=cloud, kind="market-data", asset_group="cefi"
+                    cloud=cloud_name, kind="market-data", asset_group="cefi"
                 )
             if not self.market_data_tick_bucket_tradfi:
                 self.market_data_tick_bucket_tradfi = resolve_bucket_name(
-                    cloud=cloud, kind="market-data", asset_group="tradfi"
+                    cloud=cloud_name, kind="market-data", asset_group="tradfi"
                 )
             if not self.market_data_tick_bucket_defi:
                 self.market_data_tick_bucket_defi = resolve_bucket_name(
-                    cloud=cloud, kind="market-data", asset_group="defi"
+                    cloud=cloud_name, kind="market-data", asset_group="defi"
                 )
 
 

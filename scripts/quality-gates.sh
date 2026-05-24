@@ -17,6 +17,7 @@ LOCAL_DEPS=()
 # to avoid pulling the heavy pyarrow dep at module import (only needed for recon).
 IMPORT_INSIDE_EXCLUDE_GLOBS=("!**/stages/stage0_data_pipeline_recon.py")
 CODEX_MAX_VIOLATIONS=1  # pre-existing pip-audit advisory; no upstream fix available
+MAX_DURATION=500  # codex compliance steps take ~370s on this host
 if [ "${CLOUD_BUILD:-}" = "true" ] && [ -d "/workspace/unified-trading-pm" ]; then
     WORKSPACE_ROOT="/workspace"
 else
