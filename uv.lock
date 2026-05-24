@@ -2329,31 +2329,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-json-report"
-version = "1.5.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-    { name = "pytest-metadata" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/d3/765dae9712fcd68d820338908c1337e077d5fdadccd5cacf95b9b0bea278/pytest-json-report-1.5.0.tar.gz", hash = "sha256:2dde3c647851a19b5f3700729e8310a6e66efb2077d674f27ddea3d34dc615de", size = 21241, upload-time = "2022-03-15T21:03:10.2Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/35/d07400c715bf8a88aa0c1ee9c9eb6050ca7fe5b39981f0eea773feeb0681/pytest_json_report-1.5.0-py3-none-any.whl", hash = "sha256:9897b68c910b12a2e48dd849f9a284b2c79a732a8a9cb398452ddd23d3c8c325", size = 13222, upload-time = "2022-03-15T21:03:08.65Z" },
-]
-
-[[package]]
-name = "pytest-metadata"
-version = "3.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a6/85/8c969f8bec4e559f8f2b958a15229a35495f5b4ce499f6b865eac54b878d/pytest_metadata-3.1.1.tar.gz", hash = "sha256:d2a29b0355fbc03f168aa96d41ff88b1a3b44a3b02acbe491801c98a048017c8", size = 9952, upload-time = "2024-02-12T19:38:44.887Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/43/7e7b2ec865caa92f67b8f0e9231a798d102724ca4c0e1f414316be1c1ef2/pytest_metadata-3.1.1-py3-none-any.whl", hash = "sha256:c8e0844db684ee1c798cfa38908d20d67d0463ecb6137c72e91f418558dd5f4b", size = 11428, upload-time = "2024-02-12T19:38:42.531Z" },
-]
-
-[[package]]
 name = "pytest-socket"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2748,14 +2723,14 @@ wheels = [
 
 [[package]]
 name = "starlette"
-version = "1.1.0"
+version = "0.52.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/66/4d20cdf39a8d6a51e663b7038e3b828ff211d3891a43a713fe7e4643f3a8/starlette-1.1.0.tar.gz", hash = "sha256:e83c7fe0ddecd8719c5b840080325aec0260acec86e9832899e377b91d65e90f", size = 2660060, upload-time = "2026-05-23T16:55:41.376Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/79/920b8e0a8b20f793e8d64855095cb8febabf6175b8550b6f7a547d813891/starlette-1.1.0-py3-none-any.whl", hash = "sha256:7f0dfd38e428aad5cb6f9f667f0ca1d2d8ca3f3385dccac8305f79ec98458382", size = 72899, upload-time = "2026-05-23T16:55:39.201Z" },
+    { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
 ]
 
 [[package]]
@@ -2905,7 +2880,6 @@ dependencies = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
-    { name = "pytest-json-report" },
     { name = "pytest-socket" },
     { name = "pytest-timeout" },
     { name = "pytest-xdist" },
@@ -2936,7 +2910,6 @@ requires-dist = [
     { name = "pytest", specifier = ">=9.0.3,<10.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.25.0,<2.0.0" },
     { name = "pytest-cov", specifier = ">=7.0.0,<8.0.0" },
-    { name = "pytest-json-report", specifier = ">=1.5.0,<2.0.0" },
     { name = "pytest-socket", specifier = ">=0.7.0,<1.0.0" },
     { name = "pytest-timeout", specifier = ">=2.4.0,<3.0.0" },
     { name = "pytest-xdist", specifier = ">=3.6.0,<4.0.0" },
@@ -3009,7 +2982,6 @@ dependencies = [
     { name = "scipy" },
     { name = "starlette" },
     { name = "unified-api-contracts" },
-    { name = "urllib3" },
     { name = "vulture" },
     { name = "web3" },
 ]
@@ -3025,7 +2997,7 @@ requires-dist = [
     { name = "databento", specifier = ">=0.32.0,<1.0.0" },
     { name = "fakeredis", specifier = ">=2.20.0,<3.0.0" },
     { name = "fastapi", specifier = ">=0.115.0,<1.0.0" },
-    { name = "freezegun", specifier = ">=1.2.2,<2.0.0" },
+    { name = "freezegun", specifier = ">=1.5.0,<2.0.0" },
     { name = "fsspec", specifier = ">=2025.2.0,<2026.0.0" },
     { name = "gcsfs", specifier = ">=2025.5.0,<2026.0.0" },
     { name = "google-auth", specifier = ">=2.40.0,<3.0.0" },
@@ -3064,17 +3036,16 @@ requires-dist = [
     { name = "pytest-timeout", specifier = ">=2.4.0,<3.0.0" },
     { name = "pytest-xdist", specifier = ">=3.6.0,<4.0.0" },
     { name = "python-dateutil", specifier = ">=2.8.2,<3.0.0" },
-    { name = "python-dotenv", specifier = ">=1.2.2,<2.0.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0,<2.0.0" },
     { name = "pyyaml", specifier = ">=6.0.1,<7.0.0" },
     { name = "redis", specifier = ">=5.0.0,<6.0.0" },
     { name = "ruff", specifier = "==0.15.0" },
     { name = "scikit-learn", specifier = ">=1.5.0,<2.0.0" },
     { name = "scipy", specifier = ">=1.15.0,<2.0.0" },
-    { name = "starlette", specifier = ">=1.0.1" },
+    { name = "starlette", specifier = ">=0.46.3,<1.0.0" },
     { name = "unified-api-contracts", editable = "../unified-api-contracts" },
-    { name = "urllib3", specifier = ">=2.7.0,<3.0.0" },
     { name = "vulture", specifier = ">=2.0,<3.0.0" },
-    { name = "web3", specifier = ">=6.20.0,<7.0.0" },
+    { name = "web3", specifier = ">=6.0.0,<7.0.0" },
 ]
 
 [[package]]
