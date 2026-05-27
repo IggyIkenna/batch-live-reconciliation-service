@@ -302,6 +302,60 @@ class TestStage1MLRecon:
 
         assert result.status == ReconStatus.FAILED
 
+    def test_latency_delta_breach_flags_when_samples_present(self) -> None:
+        """Matched events carrying metadata.inference_duration_ms on both sides produce a real
+        latency_delta_ms; a delta above the 5000ms threshold is flagged."""
+        from batch_live_reconciliation_service.stages.stage1_ml_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        batch: list[dict[str, object]] = [
+            {
+                "instrument_id": "BTC-USD",
+                "timeframe": "1h",
+                "signal_direction": 1,
+                "magnitude": 0.5,
+                "metadata": {"inference_duration_ms": 100.0},
+            }
+        ]
+        live: list[dict[str, object]] = [
+            {
+                "instrument_id": "BTC-USD",
+                "timeframe": "1h",
+                "signal_direction": 1,
+                "magnitude": 0.5,
+                "metadata": {"inference_duration_ms": 6000.0},
+            }
+        ]
+        metrics = _compute_metrics(batch, live)
+
+        assert metrics["latency_samples"] == 1.0
+        assert metrics["latency_delta_ms"] == 5900.0
+        deviations = _check_deviations(metrics)
+        assert any(d.metric_name == "latency_delta_ms" for d in deviations)
+
+    def test_latency_no_samples_yields_no_latency_deviation(self) -> None:
+        """Events without metadata.inference_duration_ms contribute no latency sample; the zero
+        metric must NOT be flagged — no-data is not a breach."""
+        from batch_live_reconciliation_service.stages.stage1_ml_recon import (
+            _check_deviations,
+            _compute_metrics,
+        )
+
+        batch: list[dict[str, object]] = [
+            {"instrument_id": "ETH-USD", "timeframe": "1h", "signal_direction": 1, "magnitude": 0.5}
+        ]
+        live: list[dict[str, object]] = [
+            {"instrument_id": "ETH-USD", "timeframe": "1h", "signal_direction": 1, "magnitude": 0.5}
+        ]
+        metrics = _compute_metrics(batch, live)
+
+        assert metrics["latency_samples"] == 0.0
+        assert metrics["latency_delta_ms"] == 0.0
+        deviations = _check_deviations(metrics)
+        assert not any(d.metric_name == "latency_delta_ms" for d in deviations)
+
 
 # ---------------------------------------------------------------------------
 # Stage 2: Strategy Recon

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import statistics
 from datetime import UTC, datetime
 from typing import cast
 
@@ -55,6 +56,23 @@ def _load_events(bucket: str, prefix: str) -> list[dict[str, object]]:
     return events
 
 
+def _inference_latency_ms(ev: dict[str, object]) -> float | None:
+    """Extract ``metadata.inference_duration_ms`` from an ML inference event, if numeric.
+
+    Returns None when the event carries no metadata or no numeric duration — callers must
+    treat None as "no sample" rather than a zero latency (see ``latency_samples``).
+    """
+    meta = ev.get("metadata")
+    if not isinstance(meta, dict):
+        return None
+    val = cast("dict[str, object]", meta).get("inference_duration_ms")
+    if isinstance(val, bool):  # bool is an int subclass — exclude it explicitly
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    return None
+
+
 def _compute_metrics(
     batch_events: list[dict[str, object]],
     live_events: list[dict[str, object]],
@@ -66,6 +84,7 @@ def _compute_metrics(
             "signal_magnitude_mae": 999.0,
             "instrument_coverage_pct": 0.0,
             "latency_delta_ms": 0.0,
+            "latency_samples": 0.0,
             "batch_event_count": float(len(batch_events)),
             "live_event_count": 0.0,
         }
@@ -84,6 +103,7 @@ def _compute_metrics(
 
     direction_matches = 0
     magnitude_errors: list[float] = []
+    latency_deltas: list[float] = []
 
     for key in matched_keys:
         b = batch_idx[key]
@@ -95,15 +115,23 @@ def _compute_metrics(
         b_mag = float(cast(float, b.get("magnitude", 0.0)))
         l_mag = float(cast(float, live_entry.get("magnitude", 0.0)))
         magnitude_errors.append(abs(b_mag - l_mag))
+        # Per-signal inference-latency delta — only when BOTH sides report a numeric
+        # metadata.inference_duration_ms; otherwise the pair contributes no sample.
+        b_lat = _inference_latency_ms(b)
+        l_lat = _inference_latency_ms(live_entry)
+        if b_lat is not None and l_lat is not None:
+            latency_deltas.append(abs(b_lat - l_lat))
 
     direction_match_rate = direction_matches / max(len(matched_keys), 1)
     mae = sum(magnitude_errors) / max(len(magnitude_errors), 1)
+    latency_delta = statistics.median(latency_deltas) if latency_deltas else 0.0
 
     return {
         "signal_direction_match_rate": direction_match_rate,
         "signal_magnitude_mae": mae,
         "instrument_coverage_pct": coverage,
-        "latency_delta_ms": 0.0,  # latency delta requires timestamp comparison
+        "latency_delta_ms": latency_delta,
+        "latency_samples": float(len(latency_deltas)),
         "batch_event_count": float(len(batch_events)),
         "live_event_count": float(len(live_events)),
     }
@@ -162,7 +190,9 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
             )
         )
 
-    if metrics["latency_delta_ms"] > t.latency_delta_ms_max:
+    # Only flag latency when at least one matched pair actually carried a duration on both
+    # sides — a zero metric with zero samples means "no data", not "passed".
+    if metrics.get("latency_samples", 0.0) > 0 and metrics["latency_delta_ms"] > t.latency_delta_ms_max:
         deviations.append(
             DeviationRecord.new(
                 metric_name="latency_delta_ms",
@@ -172,7 +202,8 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                 direction="above",
                 description=(
                     f"Median latency delta {metrics['latency_delta_ms']:.0f}ms "
-                    f"> {t.latency_delta_ms_max:.0f}ms threshold"
+                    f"> {t.latency_delta_ms_max:.0f}ms threshold "
+                    f"({int(metrics['latency_samples'])} samples)"
                 ),
                 dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
