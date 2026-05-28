@@ -22,6 +22,7 @@ Fail-open on OSError/ValueError per workspace manifest-guard contract.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
@@ -36,8 +37,21 @@ from batch_live_reconciliation_service.models.recon_report import (
 
 logger = logging.getLogger(__name__)
 
-_PIPELINE_MODE_BATCH = "batch"
-_PIPELINE_MODE_LIVE = "live"
+# PipelineMode values use source-specific strings (e.g. "batch_tardis",
+# "batch_databento", "live_websocket"). Batch = any value starting with
+# "batch_"; live = the single "live_websocket" value.
+_PIPELINE_MODE_LIVE_VALUE = "live_websocket"
+_PIPELINE_MODE_BATCH_PREFIX = "batch_"
+
+
+def _is_batch_mode(mode: str) -> bool:
+    """True for any batch-source pipeline_mode (e.g. batch_tardis, batch_databento)."""
+    return bool(mode) and mode.startswith(_PIPELINE_MODE_BATCH_PREFIX)
+
+
+def _is_live_mode(mode: str) -> bool:
+    """True for live_websocket pipeline_mode."""
+    return mode == _PIPELINE_MODE_LIVE_VALUE
 
 
 @dataclass
@@ -55,20 +69,19 @@ def _get_sides(manifest_df: pd.DataFrame, date_str: str) -> _ManifestSidePair:
     """Extract batch and live rows for one date from a manifest DataFrame."""
     date_rows = manifest_df[manifest_df["date"].astype(str) == date_str]
 
-    def _extract(mode: str) -> tuple[str, str]:
-        if "pipeline_mode" in manifest_df.columns:
-            rows = date_rows[date_rows["pipeline_mode"] == mode]
-        else:
+    def _extract(predicate: Callable[[str], bool]) -> tuple[str, str]:
+        if "pipeline_mode" not in manifest_df.columns:
             # Manifest pre-v8 or no pipeline_mode column — treat as absent.
             return "absent", ""
+        rows = date_rows[date_rows["pipeline_mode"].apply(predicate)]
         if rows.empty:
             return "absent", ""
         status = str(cast(object, rows["capture_status"].iloc[0]))
         reason = str(cast(object, rows["error_reason"].iloc[0])) if "error_reason" in rows.columns else ""
         return status, reason
 
-    batch_status, batch_reason = _extract(_PIPELINE_MODE_BATCH)
-    live_status, live_reason = _extract(_PIPELINE_MODE_LIVE)
+    batch_status, batch_reason = _extract(_is_batch_mode)
+    live_status, live_reason = _extract(_is_live_mode)
     return _ManifestSidePair(
         date=date_str,
         batch_status=batch_status,
