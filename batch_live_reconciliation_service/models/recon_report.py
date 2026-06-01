@@ -2,25 +2,45 @@
 Pydantic models for reconciliation reports.
 
 No Any types per workspace standards.
+
+# SCHEMA_PROVENANCE_EXEMPT — service-internal pipeline models (CORRECT-LOCAL).
+# ReconReport, StageReport, DeviationRecord are not cross-service contracts;
+# they are the private result types for this service's T+1 pipeline.
+# Cross-service contract (resolution workflow) lives in unified-internal-contracts.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
+from unified_api_contracts.internal.reconciliation import ReconciliationAgeFields, ReconciliationDimension
 
 
 class ReconStage(StrEnum):
     """T+1 reconciliation pipeline stages."""
 
     CONFIG_PULL = "config_pull"
+    DATA_PIPELINE_RECON = "data_pipeline_recon"
     ML_RECON = "ml_recon"
     STRATEGY_RECON = "strategy_recon"
     EXECUTION_RECON = "execution_recon"
+    PAPER_LIVE_RECON = "paper_live_recon"
+    BATCH_PAPER_RECON = "batch_paper_recon"
     AGENT_ANALYSIS = "agent_analysis"
     RESULTS_WRITER = "results_writer"
+
+
+class FailureRoutingAction(StrEnum):
+    """Closed-set policy for paper-vs-live / batch-vs-paper deviation failures.
+
+    pvl-p21a: alert is always emitted; escalation determines automatic system response.
+    """
+
+    ALERT = "alert"
+    AUTO_PAUSE_LIVE = "auto_pause_live"
+    AUTO_DEMOTE_TO_PAPER = "auto_demote_to_paper"
 
 
 class ReconStatus(StrEnum):
@@ -33,10 +53,13 @@ class ReconStatus(StrEnum):
     SKIPPED = "skipped"
 
 
-class DeviationRecord(
-    BaseModel
-):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
-    """A single metric deviation above threshold."""
+class DeviationRecord(ReconciliationAgeFields):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
+    """A single metric deviation above threshold.
+
+    Inherits ``ReconciliationAgeFields`` for age-tracking (P0.4) and carries
+    ``dimension: ReconciliationDimension`` for 12-dimension tagging (P0.6).
+    All age fields are populated at row-creation time, never at query time.
+    """
 
     metric_name: str
     stage: ReconStage
@@ -45,11 +68,46 @@ class DeviationRecord(
     direction: str  # "above" | "below"
     description: str
     instrument_id: str | None = None
+    dimension: ReconciliationDimension
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        metric_name: str,
+        stage: ReconStage,
+        actual_value: float,
+        threshold: float,
+        direction: str,
+        description: str,
+        dimension: ReconciliationDimension,
+        instrument_id: str | None = None,
+        first_seen_at: datetime | None = None,
+        last_seen_at: datetime | None = None,
+        unreconciled_age_seconds: int | None = None,
+    ) -> DeviationRecord:
+        """Factory that auto-populates age fields at write-time (P0.4 compliance).
+
+        Callers MUST supply ``dimension`` explicitly per the 12-dimension tagging
+        requirement (P0.6). Age fields default to now / 0 seconds if not supplied.
+        """
+        now = datetime.now(UTC)
+        return cls(
+            metric_name=metric_name,
+            stage=stage,
+            actual_value=actual_value,
+            threshold=threshold,
+            direction=direction,
+            description=description,
+            dimension=dimension,
+            instrument_id=instrument_id,
+            first_seen_at=first_seen_at if first_seen_at is not None else now,
+            last_seen_at=last_seen_at if last_seen_at is not None else now,
+            unreconciled_age_seconds=unreconciled_age_seconds if unreconciled_age_seconds is not None else 0,
+        )
 
 
-class StageReport(
-    BaseModel
-):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
+class StageReport(BaseModel):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
     """Results for a single reconciliation stage."""
 
     stage: ReconStage
@@ -70,9 +128,7 @@ class StageReport(
         return self.status == ReconStatus.PASSED
 
 
-class ReconReport(
-    BaseModel
-):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
+class ReconReport(BaseModel):  # CORRECT-LOCAL — service-internal recon report, not a domain contract
     """Full T+1 reconciliation run report."""
 
     date: str  # YYYY-MM-DD

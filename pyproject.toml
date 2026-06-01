@@ -9,55 +9,123 @@ description = "T+1 nightly batch-live reconciliation orchestrator"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "pydantic<3.0.0,>=2.12.5",
-    "unified-config-interface",
-    "unified-cloud-interface",
-    "unified-events-interface",
-    "unified-trading-library",
+    "unified-trading-library>=0.1.0,<1.0.0",
+    "unified-api-contracts>=0.1.0,<1.0.0",
+    # Pinned to safe versions (CVE-2026-{34073,39892,44431,44432,28684})
+    "cryptography>=46.0.7,<47.0.0",
+    "urllib3>=2.7.0,<3.0.0",
+    "python-dotenv>=1.2.2,<2.0.0",
+    "pytest<10.0.0,>=9.0.3",
+    "pytest-cov<8.0.0,>=7.0.0",
+    "pytest-socket>=0.7.0,<1.0.0",
+    "pytest-timeout<3.0.0,>=2.4.0",
+    "pytest-xdist<4.0.0,>=3.6.0",
+    "basedpyright==1.38.2",
+    "pygments>=2.20.0,<3.0.0",
+    "requests>=2.33.0,<3.0.0",
+    "aiohttp>=3.13.4,<4.0.0",
+
 ]
 
 [project.scripts]
 batch-live-reconciliation-service = "batch_live_reconciliation_service.cli.main:main"
 
 
-[tool.uv.sources.unified-config-interface]
-path = "../unified-config-interface"
-editable = true
-
-[tool.uv.sources.unified-cloud-interface]
-path = "../unified-cloud-interface"
-editable = true
-
-[tool.uv.sources.unified-events-interface]
-path = "../unified-events-interface"
-editable = true
-
 [tool.uv.sources.unified-trading-library]
 path = "../unified-trading-library"
 editable = true
 
+[tool.uv.sources.unified-api-contracts]
+path = "../unified-api-contracts"
+editable = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+exclude = [".cursor", ".venv", ".venv-workspace", "build", "dist", "node_modules"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E402", "BLE001"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 26
+
+[tool.ruff.lint.per-file-ignores]
+"*/__init__.py" = ["F401", "E402"]
+"tests/*" = ["F401", "F841", "F811"]
+"tests/conftest.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["batch_live_reconciliation_service"]
+known-third-party = ["unified_trading_library", "unified_api_contracts"]
+
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
+include = ["batch_live_reconciliation_service"]
+exclude = ["tests", "**/__pycache__", ".venv*", ".venv-workspace", "build", "dist", "node_modules"]
+reportMissingImports = "error"
+reportMissingTypeStubs = false
 reportAny = "error"
+reportUnknownArgumentType = "error"
 reportUnknownMemberType = "error"
+reportUnknownParameterType = "error"
 reportUnknownVariableType = "error"
+reportMissingParameterType = "error"
+reportArgumentType = "error"
+reportReturnType = "error"
+reportAssignmentType = "error"
+reportCallIssue = "error"
+reportGeneralTypeIssues = "error"
+reportIndexIssue = "error"
+reportOptionalMemberAccess = "error"
+reportAttributeAccessIssue = "error"
 
-[tool.ruff]
-target-version = "py313"
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+[[tool.basedpyright.executionEnvironments]]
+root = "."
+pythonVersion = "3.13"
+pythonPlatform = "All"
+extraPaths = [
+    "../unified-config-interface",
+    "../unified-internal-contracts",
+    "../unified-trading-library",
+    "../unified-cloud-interface",
+    "../unified-api-contracts",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-socket>=0.7.0,<1.0.0",
-    "pytest-timeout>=2.3.1",
-    "pytest-xdist>=3.6.1",
-    "basedpyright==1.38.2",
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+markers = [
+    "unit: mark test as unit test",
+    "integration: integration tests requiring real GCP credentials and API keys",
+    "smoke: mark test as smoke test",
 ]
+
+[tool.coverage.run]
+source = ["batch_live_reconciliation_service"]
+branch = true
+
+# Coverage floor (Wave E P4.7 — workspace audit 2026-05-01). Aligns with
+# the workspace floor of 70 set by scripts/quality-gates.sh; explicit
+# pyproject declaration so direct pytest runs honor the same threshold.
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.bandit]
+skips = []

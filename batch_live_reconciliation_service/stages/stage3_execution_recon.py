@@ -21,8 +21,8 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
-from unified_cloud_interface import get_storage_client
-from unified_events_interface import log_event
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
+from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
 from batch_live_reconciliation_service.models.deviation_thresholds import EXECUTION_THRESHOLDS
@@ -75,17 +75,32 @@ def _compute_metrics(
     live_fills = fills(live_events)
     batch_fills = fills(batch_events)
 
-    # Alpha P&L gap: live fills P&L - batch fills P&L
+    # Alpha P&L gap: live fills P&L - batch fills P&L (aggregate)
     live_pnl = sum(
-        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
-        for e in live_fills
+        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0))) for e in live_fills
     )
     batch_pnl = sum(
-        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
-        for e in batch_fills
+        float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0))) for e in batch_fills
     )
     notional = abs(live_pnl) or 1.0
     alpha_gap = abs(live_pnl - batch_pnl) / notional
+
+    # Per-archetype P&L gap in bps — consumed by orchestrator for RECON_GREEN_THRESHOLDS check.
+    # Events carry optional `archetype` field; unknown/absent archetype is skipped.
+    per_archetype_bps: dict[str, float] = {}
+    for archetype in set(str(e["archetype"]) for evs in (live_fills, batch_fills) for e in evs if e.get("archetype")):
+        arc_live_pnl = sum(
+            float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
+            for e in live_fills
+            if e.get("archetype") == archetype
+        )
+        arc_batch_pnl = sum(
+            float(cast(float, e.get("fill_price", 0.0))) * float(cast(float, e.get("filled_qty", 0.0)))
+            for e in batch_fills
+            if e.get("archetype") == archetype
+        )
+        arc_notional = abs(arc_live_pnl) or 1.0
+        per_archetype_bps[archetype] = abs(arc_live_pnl - arc_batch_pnl) / arc_notional * 10_000
 
     # Fill rate: filled orders / submitted orders
     live_submitted = sum(1 for e in live_events if e.get("event_type") == "ORDER_SUBMITTED")
@@ -107,13 +122,11 @@ def _compute_metrics(
     algo_accuracy = algo_correct / max(len(algo_events), 1)
 
     # P99 latency from live orders
-    latencies = [
-        float(cast(float, e.get("latency_ms", 0.0))) for e in live_fills if e.get("latency_ms")
-    ]
+    latencies = [float(cast(float, e.get("latency_ms", 0.0))) for e in live_fills if e.get("latency_ms")]
     latencies.sort()
     p99_latency = latencies[int(len(latencies) * 0.99)] if latencies else 0.0
 
-    return {
+    metrics: dict[str, float] = {
         "alpha_pnl_gap": alpha_gap,
         "fill_rate_delta": fill_rate_delta,
         "slippage_delta_bps": slippage_delta,
@@ -122,6 +135,9 @@ def _compute_metrics(
         "batch_fill_count": float(len(batch_fills)),
         "live_fill_count": float(len(live_fills)),
     }
+    for archetype, bps_val in per_archetype_bps.items():
+        metrics[f"alpha_pnl_gap_bps_{archetype}"] = bps_val
+    return metrics
 
 
 def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
@@ -148,39 +164,34 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
             metrics["slippage_delta_bps"],
             t.slippage_delta_bps_max,
             "above",
-            (
-                f"Slippage delta {metrics['slippage_delta_bps']:.1f}bps"
-                f" > {t.slippage_delta_bps_max:.0f}bps"
-            ),
+            (f"Slippage delta {metrics['slippage_delta_bps']:.1f}bps > {t.slippage_delta_bps_max:.0f}bps"),
         ),
         (
             "order_latency_p99_ms",
             metrics["order_latency_p99_ms"],
             t.order_latency_p99_ms_max,
             "above",
-            (
-                f"P99 latency {metrics['order_latency_p99_ms']:.0f}ms"
-                f" > {t.order_latency_p99_ms_max:.0f}ms"
-            ),
+            (f"P99 latency {metrics['order_latency_p99_ms']:.0f}ms > {t.order_latency_p99_ms_max:.0f}ms"),
         ),
     ]
 
     for name, actual, threshold, direction, desc in checks:
         if direction == "above" and actual > threshold:
             deviations.append(
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name=name,
                     stage=ReconStage.EXECUTION_RECON,
                     actual_value=actual,
                     threshold=threshold,
                     direction=direction,
                     description=desc,
+                    dimension=ReconciliationDimension.FILLS,
                 )
             )
 
     if metrics["algo_selection_accuracy"] < t.algo_selection_accuracy_min:
         deviations.append(
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="algo_selection_accuracy",
                 stage=ReconStage.EXECUTION_RECON,
                 actual_value=metrics["algo_selection_accuracy"],
@@ -190,6 +201,7 @@ def _check_deviations(metrics: dict[str, float]) -> list[DeviationRecord]:
                     f"Algo selection accuracy {metrics['algo_selection_accuracy']:.1%} "
                     f"< {t.algo_selection_accuracy_min:.0%}"
                 ),
+                dimension=ReconciliationDimension.FILLS,
             )
         )
 

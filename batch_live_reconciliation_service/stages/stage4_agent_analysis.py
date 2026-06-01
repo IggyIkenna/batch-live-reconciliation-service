@@ -11,8 +11,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from unified_cloud_interface import get_storage_client
-from unified_events_interface import log_event
+from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
 from batch_live_reconciliation_service.models.recon_report import (
@@ -135,9 +134,7 @@ def run_stage4(
 
     except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, OSError) as e:
         logger.exception("[Stage 4] Agent analysis failed: %s", e)
-        log_event(
-            "PROCESSING_COMPLETED", details={"stage": "stage4_agent_analysis", "status": "FAILED"}
-        )
+        log_event("PROCESSING_COMPLETED", details={"stage": "stage4_agent_analysis", "status": "FAILED"})
         return StageReport(
             stage=ReconStage.AGENT_ANALYSIS,
             status=ReconStatus.FAILED,

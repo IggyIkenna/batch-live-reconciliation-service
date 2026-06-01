@@ -12,14 +12,15 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from unified_events_interface import MockEventSink, setup_events
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
+from unified_trading_library import MockEventSink, setup_events
 
 # Initialize events for the test session (needed before any log_event calls)
 setup_events(service_name="batch-recon-test", mode="test", sink=MockEventSink())
 
 
 # ---------------------------------------------------------------------------
-# unified_config_interface
+# unified_trading_library.config_interface
 # ---------------------------------------------------------------------------
 
 
@@ -29,7 +30,11 @@ class TestUnifiedConfigInterface:
 
     def test_recon_config_instantiation(self) -> None:
         """ReconConfig extends UnifiedCloudConfig with recon-specific fields."""
+        from unified_trading_library import UnifiedCloudConfig
+
         from batch_live_reconciliation_service.config import ReconConfig
+
+        assert issubclass(ReconConfig, UnifiedCloudConfig)
 
         config = ReconConfig()
         assert isinstance(config.stage_timeout_seconds, int)
@@ -59,7 +64,7 @@ class TestUnifiedConfigInterface:
 
 
 # ---------------------------------------------------------------------------
-# unified_events_interface
+# unified_trading_library.events
 # ---------------------------------------------------------------------------
 
 
@@ -69,7 +74,7 @@ class TestUnifiedEventsInterface:
 
     def test_log_event_with_stage_details(self) -> None:
         """log_event() accepts stage-specific details used by the orchestrator."""
-        from unified_events_interface import log_event
+        from unified_trading_library import log_event
 
         log_event(
             "PROCESSING_STARTED",
@@ -78,12 +83,10 @@ class TestUnifiedEventsInterface:
 
     def test_log_event_started_stopped(self) -> None:
         """Service uses STARTED/STOPPED/FAILED lifecycle events."""
-        from unified_events_interface import log_event
+        from unified_trading_library import log_event
 
         log_event("STARTED", details={"date": "2026-03-15", "run_id": "test-run", "dry_run": True})
-        log_event(
-            "STOPPED", details={"date": "2026-03-15", "run_id": "test-run", "total_deviations": 0}
-        )
+        log_event("STOPPED", details={"date": "2026-03-15", "run_id": "test-run", "total_deviations": 0})
         log_event(
             "FAILED",
             details={"date": "2026-03-15", "run_id": "test-run", "failed_stages": "stage0"},
@@ -91,7 +94,7 @@ class TestUnifiedEventsInterface:
 
     def test_setup_events_with_gcs_event_sink_mock(self) -> None:
         """setup_events() can be called with a mock GCSEventSink-like object."""
-        from unified_events_interface import setup_events
+        from unified_trading_library import setup_events
 
         mock_sink = MagicMock()
         # GCSEventSink interface: emit(), flush()
@@ -101,7 +104,7 @@ class TestUnifiedEventsInterface:
 
 
 # ---------------------------------------------------------------------------
-# unified_cloud_interface
+# unified_trading_library.cloud_interface
 # ---------------------------------------------------------------------------
 
 
@@ -111,7 +114,7 @@ class TestUnifiedCloudInterface:
 
     def test_get_storage_client_interface(self) -> None:
         """get_storage_client() returns a client with required methods."""
-        from unified_cloud_interface import get_storage_client
+        from unified_trading_library import get_storage_client
 
         client = get_storage_client()
         assert hasattr(client, "upload_bytes")
@@ -215,7 +218,7 @@ class TestUnifiedTradingLibrary:
             assert level.value == level_str
 
     def test_recon_report_model_construction(self) -> None:
-        """ReconReport (uses unified_config_interface indirectly) builds correctly."""
+        """ReconReport (uses UTL config_interface indirectly) builds correctly."""
         from batch_live_reconciliation_service.models.recon_report import (
             DeviationRecord,
             ReconReport,
@@ -230,13 +233,14 @@ class TestUnifiedTradingLibrary:
             started_at=datetime.now(UTC),
             completed_at=datetime.now(UTC),
             deviations=[
-                DeviationRecord(
+                DeviationRecord.new(
                     metric_name="sharpe_ratio",
                     stage=ReconStage.ML_RECON,
                     actual_value=1.5,
                     threshold=2.0,
                     direction="below",
                     description="Sharpe below threshold",
+                    dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
                 )
             ],
             metrics={"accuracy": 0.95},
@@ -257,18 +261,21 @@ class TestUnifiedTradingLibrary:
     def test_orchestrator_dry_run_full_pipeline(self) -> None:
         """Full orchestrator pipeline completes in dry_run mode."""
         from batch_live_reconciliation_service.config import get_recon_config
+        from batch_live_reconciliation_service.engine.orchestrator import run_reconciliation
         from batch_live_reconciliation_service.models.recon_report import ReconStatus
-        from batch_live_reconciliation_service.orchestrator import run_reconciliation
 
         get_recon_config.cache_clear()
-        report = run_reconciliation(date="2026-03-15", dry_run=True)
+        # Patch _setup_observability so the test-session MockEventSink is preserved
+        # (dry_run skips GCS I/O but setup_events would replace the mock sink with GCSEventSink)
+        with patch("batch_live_reconciliation_service.engine.orchestrator._setup_observability"):
+            report = run_reconciliation(date="2026-03-15", dry_run=True)
 
-        assert report.date == "2026-03-15"
-        assert report.run_id is not None
-        assert len(report.run_id) > 0
-        assert report.started_at is not None
-        assert report.completed_at is not None
-        assert report.status in (ReconStatus.PASSED, ReconStatus.FAILED)
-        # In dry_run, all stages should complete (not crash)
-        assert len(report.stages) >= 1
+            assert report.date == "2026-03-15"
+            assert report.run_id is not None
+            assert len(report.run_id) > 0
+            assert report.started_at is not None
+            assert report.completed_at is not None
+            assert report.status in (ReconStatus.PASSED, ReconStatus.FAILED)
+            # In dry_run, all stages should complete (not crash)
+            assert len(report.stages) >= 1
         get_recon_config.cache_clear()

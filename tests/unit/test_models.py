@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from unified_api_contracts.internal.reconciliation import ReconciliationDimension
+
 from batch_live_reconciliation_service.models.recon_report import (
     DeviationRecord,
     ReconReport,
@@ -24,13 +26,14 @@ def test_stage_report_passed() -> None:
 
 
 def test_stage_report_with_deviations() -> None:
-    deviation = DeviationRecord(
+    deviation = DeviationRecord.new(
         metric_name="signal_direction_match_rate",
         stage=ReconStage.ML_RECON,
         actual_value=0.88,
         threshold=0.95,
         direction="below",
         description="Match rate 88.0% < 95% threshold",
+        dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
     )
     report = StageReport(
         stage=ReconStage.ML_RECON,
@@ -48,13 +51,14 @@ def test_recon_report_total_deviations() -> None:
         status=ReconStatus.FAILED,
         started_at=datetime.now(UTC),
         deviations=[
-            DeviationRecord(
+            DeviationRecord.new(
                 metric_name="signal_direction_match_rate",
                 stage=ReconStage.ML_RECON,
                 actual_value=0.88,
                 threshold=0.95,
                 direction="below",
                 description="test",
+                dimension=ReconciliationDimension.STRATEGY_LEVEL_ALLOCATION,
             )
         ],
     )
