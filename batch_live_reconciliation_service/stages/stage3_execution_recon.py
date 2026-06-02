@@ -54,6 +54,30 @@ def _load_events(bucket: str, prefix: str) -> list[dict[str, object]]:
     return events
 
 
+def _live_drawdown_pct(live_fills: list[dict[str, object]]) -> float:
+    """Peak-to-trough drawdown (pct) of the cumulative live-fill notional P&L.
+
+    Walks live fills in event order, accumulating ``fill_price * filled_qty``
+    (signed by ``side``: SELL credits, BUY debits). The drawdown is the largest
+    peak-to-trough decline expressed as a percentage of the running peak. Returns
+    0.0 when there is no decline or no usable peak.
+    """
+    running = 0.0
+    peak = 0.0
+    max_drawdown_pct = 0.0
+    for fill in live_fills:
+        price = float(cast(float, fill.get("fill_price", 0.0)))
+        qty = float(cast(float, fill.get("filled_qty", 0.0)))
+        side = str(fill.get("side")).upper()
+        signed = price * qty * (-1.0 if side == "BUY" else 1.0)
+        running += signed
+        peak = max(peak, running)
+        if peak > 0.0:
+            drawdown_pct = (peak - running) / peak * 100.0
+            max_drawdown_pct = max(max_drawdown_pct, drawdown_pct)
+    return max_drawdown_pct
+
+
 def _compute_metrics(
     batch_events: list[dict[str, object]],
     live_events: list[dict[str, object]],
@@ -65,6 +89,11 @@ def _compute_metrics(
             "slippage_delta_bps": 0.0,
             "algo_selection_accuracy": 1.0,
             "order_latency_p99_ms": 0.0,
+            # Absolute green-gate metrics — no live data → neutral pass values
+            # (fill_rate at the floor; drawdown at 0) so an empty live day never
+            # spuriously trips the green gate.
+            "fill_rate": 1.0,
+            "drawdown_pct": 0.0,
             "batch_fill_count": float(len(batch_events)),
             "live_fill_count": 0.0,
         }
@@ -126,12 +155,19 @@ def _compute_metrics(
     latencies.sort()
     p99_latency = latencies[int(len(latencies) * 0.99)] if latencies else 0.0
 
+    # Absolute live drawdown (pct) from the running notional P&L of live fills, in
+    # event order. Peak-to-trough on the cumulative signed value; consumed by the
+    # orchestrator green gate alongside RECON_GREEN_THRESHOLDS["drawdown_pct"].
+    drawdown_pct = _live_drawdown_pct(live_fills)
+
     metrics: dict[str, float] = {
         "alpha_pnl_gap": alpha_gap,
         "fill_rate_delta": fill_rate_delta,
         "slippage_delta_bps": slippage_delta,
         "algo_selection_accuracy": algo_accuracy,
         "order_latency_p99_ms": p99_latency,
+        "fill_rate": live_fill_rate,
+        "drawdown_pct": drawdown_pct,
         "batch_fill_count": float(len(batch_fills)),
         "live_fill_count": float(len(live_fills)),
     }

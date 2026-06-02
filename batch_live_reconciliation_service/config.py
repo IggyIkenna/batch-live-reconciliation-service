@@ -32,11 +32,26 @@ class ReconConfig(UnifiedCloudConfig):
     market_data_tick_bucket_tradfi: str = ""
     market_data_tick_bucket_defi: str = ""
 
+    # Strategy-service base URL — canonical position/PnL baseline for Stage 2
+    # (GET {url}/api/v1/accounts/{account_id}/pnl-series). When unset, Stage 2
+    # falls back to the raw GCS strategy-service event archives.
+    strategy_service_url: str = ""
+
+    # Account id used to query the strategy-service pnl-series baseline in Stage 2.
+    strategy_account_id: str = "odum-live"
+
     # Cloud Run Job timeout per stage (seconds)
     stage_timeout_seconds: int = 1800  # 30 minutes
 
     # Whether to skip writing to GCS (dry-run mode)
     dry_run: bool = False
+
+    # Soak mode — during a paper/live soak window, recon deviations are still
+    # detected + reported but CRITICAL escalation is suppressed (downgraded to a
+    # non-paging routing). The CRITICAL-suppression counterpart lives in
+    # alerting-service; this flag is the producer-side signal carried on emitted
+    # recon-drift events.
+    soak_mode: bool = False
 
     @override
     def model_post_init(self, __context: object) -> None:
