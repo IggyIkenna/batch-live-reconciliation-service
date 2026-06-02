@@ -24,7 +24,7 @@ from unified_trading_library import log_event
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/reconciliation", tags=["reconciliation"])
+router = APIRouter(prefix="/t1-recon", tags=["reconciliation"])
 
 
 # ---------------------------------------------------------------------------

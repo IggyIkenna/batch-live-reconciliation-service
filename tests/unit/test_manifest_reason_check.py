@@ -27,6 +27,10 @@ _BUCKET = "features-bucket"
 _AG = "cefi"
 _DATE = "2026-02-10"
 
+# Real PipelineMode string values as written to the manifest.
+_BATCH = "batch_tardis"
+_LIVE = "live_websocket"
+
 
 def _make_manifest(rows: list[dict[str, str]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
@@ -55,48 +59,48 @@ def _row(pipeline_mode: str, capture_status: str, error_reason: str = "") -> dic
 
 
 def test_both_captured_no_deviation() -> None:
-    deviations = _check(_row("batch", "captured"), _row("live", "captured"))
+    deviations = _check(_row(_BATCH, "captured"), _row(_LIVE, "captured"))
     assert deviations == []
 
 
 def test_both_empty_confirmed_same_reason_no_deviation() -> None:
     deviations = _check(
-        _row("batch", "empty_confirmed", "EXPECTED_HOLIDAY"),
-        _row("live", "empty_confirmed", "EXPECTED_HOLIDAY"),
+        _row(_BATCH, "empty_confirmed", "EXPECTED_HOLIDAY"),
+        _row(_LIVE, "empty_confirmed", "EXPECTED_HOLIDAY"),
     )
     assert deviations == []
 
 
 def test_both_empty_confirmed_different_reasons_flagged() -> None:
     deviations = _check(
-        _row("batch", "empty_confirmed", "EXPECTED_HOLIDAY"),
-        _row("live", "empty_confirmed", "SOURCE_RETURNED_ZERO"),
+        _row(_BATCH, "empty_confirmed", "EXPECTED_HOLIDAY"),
+        _row(_LIVE, "empty_confirmed", "SOURCE_RETURNED_ZERO"),
     )
     assert len(deviations) == 1
     assert "reasons differ" in deviations[0].description
 
 
 def test_one_captured_other_attempted_failed_flagged() -> None:
-    deviations = _check(_row("batch", "captured"), _row("live", "attempted_failed"))
+    deviations = _check(_row(_BATCH, "captured"), _row(_LIVE, "attempted_failed"))
     assert len(deviations) == 1
     assert "one side captured while other failed" in deviations[0].description
 
 
 def test_attempted_failed_vs_captured_symmetric() -> None:
-    deviations = _check(_row("batch", "attempted_failed"), _row("live", "captured"))
+    deviations = _check(_row(_BATCH, "attempted_failed"), _row(_LIVE, "captured"))
     assert len(deviations) == 1
 
 
 def test_both_attempted_failed_flagged() -> None:
-    deviations = _check(_row("batch", "attempted_failed"), _row("live", "attempted_failed"))
+    deviations = _check(_row(_BATCH, "attempted_failed"), _row(_LIVE, "attempted_failed"))
     assert len(deviations) == 1
     assert "attempted_failed on at least one side" in deviations[0].description
 
 
 def test_one_captured_other_empty_confirmed_flagged() -> None:
     deviations = _check(
-        _row("batch", "captured"),
-        _row("live", "empty_confirmed", "EXPECTED_HOLIDAY"),
+        _row(_BATCH, "captured"),
+        _row(_LIVE, "empty_confirmed", "EXPECTED_HOLIDAY"),
     )
     assert len(deviations) == 1
     assert "batch=captured but live=empty_confirmed" in deviations[0].description
@@ -132,8 +136,8 @@ def test_empty_manifest_fails_open() -> None:
 def test_absent_date_no_rows_skips() -> None:
     manifest = _make_manifest(
         [
-            {"date": "2026-01-01", "pipeline_mode": "batch", "capture_status": "captured", "error_reason": ""},
-            {"date": "2026-01-01", "pipeline_mode": "live", "capture_status": "captured", "error_reason": ""},
+            {"date": "2026-01-01", "pipeline_mode": _BATCH, "capture_status": "captured", "error_reason": ""},
+            {"date": "2026-01-01", "pipeline_mode": _LIVE, "capture_status": "captured", "error_reason": ""},
         ]
     )
     with patch(
@@ -158,24 +162,30 @@ def test_missing_pipeline_mode_column_skips() -> None:
     assert deviations == []
 
 
+def test_batch_databento_pipeline_mode_matches() -> None:
+    """Any batch_* variant (not just batch_tardis) must be recognized as the batch side."""
+    deviations = _check(_row("batch_databento", "captured"), _row(_LIVE, "captured"))
+    assert deviations == []
+
+
 def test_multiple_dates_mixed_outcomes() -> None:
     rows = [
-        {"date": "2026-02-10", "pipeline_mode": "batch", "capture_status": "captured", "error_reason": ""},
-        {"date": "2026-02-10", "pipeline_mode": "live", "capture_status": "captured", "error_reason": ""},
+        {"date": "2026-02-10", "pipeline_mode": _BATCH, "capture_status": "captured", "error_reason": ""},
+        {"date": "2026-02-10", "pipeline_mode": _LIVE, "capture_status": "captured", "error_reason": ""},
         {
             "date": "2026-02-11",
-            "pipeline_mode": "batch",
+            "pipeline_mode": _BATCH,
             "capture_status": "empty_confirmed",
             "error_reason": "EXPECTED_HOLIDAY",
         },
         {
             "date": "2026-02-11",
-            "pipeline_mode": "live",
+            "pipeline_mode": _LIVE,
             "capture_status": "empty_confirmed",
             "error_reason": "SOURCE_RETURNED_ZERO",
         },
-        {"date": "2026-02-12", "pipeline_mode": "batch", "capture_status": "captured", "error_reason": ""},
-        {"date": "2026-02-12", "pipeline_mode": "live", "capture_status": "attempted_failed", "error_reason": ""},
+        {"date": "2026-02-12", "pipeline_mode": _BATCH, "capture_status": "captured", "error_reason": ""},
+        {"date": "2026-02-12", "pipeline_mode": _LIVE, "capture_status": "attempted_failed", "error_reason": ""},
     ]
     manifest = _make_manifest(rows)
     with patch(
@@ -196,7 +206,7 @@ def test_multiple_dates_mixed_outcomes() -> None:
 def test_deviation_record_has_correct_stage() -> None:
     from batch_live_reconciliation_service.models.recon_report import ReconStage
 
-    deviations = _check(_row("batch", "captured"), _row("live", "attempted_failed"))
+    deviations = _check(_row(_BATCH, "captured"), _row(_LIVE, "attempted_failed"))
     assert len(deviations) == 1
     assert deviations[0].stage == ReconStage.DATA_PIPELINE_RECON
     assert deviations[0].metric_name == "manifest_reason_disagreement"

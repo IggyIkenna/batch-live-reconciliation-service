@@ -111,7 +111,13 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
         # Emit BATCH_VS_LIVE_RECON_DRIFTED when batch-vs-live slippage exceeds the
         # most conservative archetype threshold from RECON_GREEN_THRESHOLDS (UAC SSOT).
         # Alerting-service picks this up via the BATCH_VS_LIVE_RECON_DRIFTED AlertRule.
+        # Soak mode downgrades paging routing ("ALERT" → "ALERT_SUPPRESSED") so
+        # alerting-service can suppress CRITICAL escalation during a soak window.
+        _drift_routing = "ALERT_SUPPRESSED" if config.soak_mode else "ALERT"
+
         slippage_bps_s3 = s3.metrics.get("slippage_delta_bps", 0.0)
+        drawdown_pct_s3 = s3.metrics.get("drawdown_pct", 0.0)
+        fill_rate_s3 = s3.metrics.get("fill_rate", 1.0)
         _min_bps_threshold = min(float(t["bps_delta_max"]) for t in RECON_GREEN_THRESHOLDS.values())
         if slippage_bps_s3 > _min_bps_threshold:
             _breached_archetypes = [
@@ -127,7 +133,41 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
                     "slippage_delta_bps": slippage_bps_s3,
                     "breached_archetypes": _breached_archetypes,
                     "thresholds": {k: str(v["bps_delta_max"]) for k, v in RECON_GREEN_THRESHOLDS.items()},
-                    "routing": "ALERT",
+                    "soak_mode": config.soak_mode,
+                    "routing": _drift_routing,
+                },
+            )
+
+        # Green gate (operator: "build all three" — bps + drawdown + fill_rate).
+        # A recon only stays GREEN when slippage_bps is within bps_delta_max (handled
+        # above via stage failure), drawdown_pct is within the archetype drawdown_pct
+        # bound, AND fill_rate is at/above the archetype fill_rate_min. The most
+        # conservative archetype bound is the firm-wide green gate; any breach demotes
+        # the run to FAILED and emits BATCH_VS_LIVE_RECON_DRIFTED for alerting.
+        _max_drawdown_bound = min(float(t["drawdown_pct"]) for t in RECON_GREEN_THRESHOLDS.values())
+        _min_fill_rate_bound = max(float(t["fill_rate_min"]) for t in RECON_GREEN_THRESHOLDS.values())
+        _drawdown_breached = drawdown_pct_s3 > _max_drawdown_bound
+        _fill_rate_breached = fill_rate_s3 < _min_fill_rate_bound
+        if _drawdown_breached or _fill_rate_breached:
+            _green_gate_breaches: list[str] = []
+            if _drawdown_breached:
+                _green_gate_breaches.append("drawdown_pct")
+            if _fill_rate_breached:
+                _green_gate_breaches.append("fill_rate")
+            if s3.status != ReconStatus.FAILED:
+                s3.status = ReconStatus.FAILED
+            log_event(
+                "BATCH_VS_LIVE_RECON_DRIFTED",
+                details={
+                    "date": date,
+                    "run_id": run_id,
+                    "drawdown_pct": drawdown_pct_s3,
+                    "fill_rate": fill_rate_s3,
+                    "drawdown_pct_max": _max_drawdown_bound,
+                    "fill_rate_min": _min_fill_rate_bound,
+                    "green_gate_breaches": _green_gate_breaches,
+                    "soak_mode": config.soak_mode,
+                    "routing": _drift_routing,
                 },
             )
 
@@ -147,7 +187,8 @@ def run_reconciliation(date: str, dry_run: bool = False) -> ReconReport:
                     "slippage_delta_bps": slippage_bps,
                     "threshold_bps": PAPER_LIVE_THRESHOLDS.slippage_delta_bps_max,
                     "stage3b_deviations": len(s3b.deviations),
-                    "routing": "ALERT_AND_AUTO_DEMOTE",
+                    "soak_mode": config.soak_mode,
+                    "routing": "ALERT_SUPPRESSED" if config.soak_mode else "ALERT_AND_AUTO_DEMOTE",
                 },
             )
 

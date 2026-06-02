@@ -20,6 +20,7 @@ import logging
 from datetime import UTC, datetime
 from typing import cast
 
+import requests
 from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_trading_library import get_storage_client, log_event
 
@@ -33,6 +34,60 @@ from batch_live_reconciliation_service.models.recon_report import (
 )
 
 logger = logging.getLogger(__name__)
+
+_PNL_SERIES_TIMEOUT_SECONDS = 5.0
+
+
+def _fetch_strategy_pnl_baseline(
+    *,
+    base_url: str,
+    account_id: str,
+    date: str,
+) -> float | None:
+    """Fetch the canonical strategy-service PnL baseline for ``date``.
+
+    Calls ``GET {base_url}/api/v1/accounts/{account_id}/pnl-series`` (mounted at
+    ``/api/v1`` in strategy-service ``position/api/main.py``) and returns the
+    total PnL across the returned series for the day. Returns ``None`` on any
+    transport error, non-2xx, 404 (no data yet onboarded), or empty series so the
+    caller can fall back to the raw GCS event archive.
+    """
+    url = f"{base_url.rstrip('/')}/api/v1/accounts/{account_id}/pnl-series"
+    # The pnl-series endpoint requires instance_id; for the day-level recon baseline
+    # we sum across all instances for the account by paging would be ideal, but the
+    # contract is per-instance — use the account id as the instance selector so a
+    # single-instance account resolves, and clip the window to the recon day.
+    params = {"instance_id": account_id, "from": date, "to": date}
+    try:
+        response = requests.get(url, params=params, timeout=_PNL_SERIES_TIMEOUT_SECONDS)
+    except requests.RequestException as exc:
+        logger.warning("Strategy pnl-series fetch failed account=%s date=%s: %s", account_id, date, exc)
+        return None
+    if response.status_code == 404:
+        logger.info("Strategy pnl-series 404 account=%s date=%s — falling back to GCS", account_id, date)
+        return None
+    if response.status_code >= 400:
+        logger.warning("Strategy pnl-series HTTP %s account=%s date=%s", response.status_code, account_id, date)
+        return None
+    try:
+        payload = cast(dict[str, object], response.json())
+    except ValueError as exc:
+        logger.warning("Strategy pnl-series JSON decode failed: %s", exc)
+        return None
+    series_obj: object = payload.get("series") or []
+    if not isinstance(series_obj, list):
+        return None
+    series_list = cast(list[object], series_obj)
+    if not series_list:
+        return None
+    total = 0.0
+    for entry in series_list:
+        if not isinstance(entry, dict):
+            continue
+        pnl: object = cast(dict[str, object], entry).get("pnl")
+        if isinstance(pnl, (int, float)):
+            total += float(pnl)
+    return total
 
 
 def _load_events(bucket: str, prefix: str) -> list[dict[str, object]]:
@@ -58,8 +113,13 @@ def _load_events(bucket: str, prefix: str) -> list[dict[str, object]]:
 def _compute_metrics(
     batch_events: list[dict[str, object]],
     live_events: list[dict[str, object]],
+    batch_pnl_override: float | None = None,
 ) -> dict[str, float]:
-    """Compute strategy reconciliation metrics."""
+    """Compute strategy reconciliation metrics.
+
+    When ``batch_pnl_override`` is provided (canonical strategy-service pnl-series
+    baseline), it replaces the GCS-event-derived batch PnL for the benchmark delta.
+    """
     if not live_events:
         return {
             "instruction_alignment_pct": 0.0,
@@ -82,11 +142,17 @@ def _compute_metrics(
     matched = set(batch_instructions) & set(live_instructions)
     alignment = len(matched) / max(len(live_instructions), 1)
 
-    # P&L delta from position snapshots
-    batch_pnl = sum(
-        float(cast(float, e.get("unrealized_pnl", 0.0)))
-        for e in batch_events
-        if e.get("event_type") == "POSITION_SNAPSHOT"
+    # P&L delta from position snapshots. The canonical batch baseline is the
+    # strategy-service pnl-series when available (batch_pnl_override); otherwise
+    # fall back to the GCS event-archive POSITION_SNAPSHOT sum.
+    batch_pnl = (
+        batch_pnl_override
+        if batch_pnl_override is not None
+        else sum(
+            float(cast(float, e.get("unrealized_pnl", 0.0)))
+            for e in batch_events
+            if e.get("event_type") == "POSITION_SNAPSHOT"
+        )
     )
     live_pnl = sum(
         float(cast(float, e.get("unrealized_pnl", 0.0)))
@@ -218,7 +284,19 @@ def run_stage2(config: ReconConfig, date: str, dry_run: bool = False) -> StageRe
 
     logger.info("[Stage 2] %d batch, %d live events", len(batch_events), len(live_events))
 
-    metrics = _compute_metrics(batch_events, live_events)
+    # Canonical batch baseline = strategy-service position/pnl query API. Falls back
+    # to the raw GCS event archive when the URL is unset or the API yields nothing.
+    batch_pnl_override: float | None = None
+    if config.strategy_service_url:
+        batch_pnl_override = _fetch_strategy_pnl_baseline(
+            base_url=config.strategy_service_url,
+            account_id=config.strategy_account_id,
+            date=date,
+        )
+    baseline_source = 1.0 if batch_pnl_override is not None else 0.0  # 1.0 = strategy-API, 0.0 = GCS fallback
+
+    metrics = _compute_metrics(batch_events, live_events, batch_pnl_override=batch_pnl_override)
+    metrics["baseline_source"] = baseline_source
     deviations = _check_deviations(metrics)
     status = ReconStatus.PASSED if not deviations else ReconStatus.FAILED
 
