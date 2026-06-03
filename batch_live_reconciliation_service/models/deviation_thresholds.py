@@ -83,6 +83,44 @@ class BatchPaperThresholds:
     latency_model_delta_ms_max: float = 200.0  # > 200ms model vs actual → alert
 
 
+@dataclass(frozen=True)
+class DataPipelineThresholds:
+    """Stage 0.5: Data pipeline reconciliation alert thresholds."""
+
+    file_count_match_rate_min: float = 0.95  # < 95% file count match → alert
+    row_count_match_rate_min: float = 0.95  # < 95% row count match → alert
+    missing_live_partition_max: int = 0  # > 0 services with no live partition → alert
+
+
+@dataclass(frozen=True)
+class PaperLiveThresholds:
+    """Stage 3b: Paper-vs-live thresholds.
+
+    Tighter than batch-vs-live: same data + similar API conditions mean larger gaps
+    indicate a paper-mode wiring bug, not normal batch/live divergence.
+    """
+
+    alpha_pnl_gap_max: float = 0.005  # > 0.5% → alert (vs batch-live 1%)
+    fill_rate_delta_max: float = 0.02  # > 2% → alert (vs batch-live 5%)
+    slippage_delta_bps_max: float = 5.0  # > 5 bps → alert (vs batch-live 10 bps)
+    order_latency_p99_ms_max: float = 400.0  # > 400ms → alert (paper should be faster)
+    algo_selection_accuracy_min: float = 0.99  # < 99% → alert (same bar as live)
+
+
+@dataclass(frozen=True)
+class BatchPaperThresholds:
+    """Stage 3c: Batch-vs-paper thresholds.
+
+    Bounded by matching-engine fidelity: the matching engine is a lower-fidelity
+    approximation of real fills, so tolerances are wider than paper-vs-live.
+    """
+
+    pnl_delta_pct_max: float = 0.05  # > 5% → alert (matching engine less precise)
+    position_delta_max: float = 5.0  # > 5 units per instrument → alert
+    fill_count_delta_pct_max: float = 0.15  # > 15% → alert (slippage model differences)
+    latency_model_delta_ms_max: float = 200.0  # > 200ms model vs actual → alert
+
+
 ML_THRESHOLDS = MLThresholds()
 STRATEGY_THRESHOLDS = StrategyThresholds()
 EXECUTION_THRESHOLDS = ExecutionThresholds()
