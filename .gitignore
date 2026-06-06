@@ -123,3 +123,7 @@ logs/
 # --- Optional: Jupyter (uncomment if repo has notebooks) ---
 # .ipynb_checkpoints/
 # profile_default/
+
+# --- QG sentinels (local-only fingerprints; never committed) ---
+/.qg_last_passed_sha
+/.qg_content_sentinel

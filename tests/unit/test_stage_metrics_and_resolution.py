@@ -171,6 +171,7 @@ class TestStage1CheckDeviations:
             "signal_magnitude_mae": 0.05,
             "instrument_coverage_pct": 0.95,
             "latency_delta_ms": 6000.0,  # above 5000ms threshold
+            "latency_samples": 5.0,  # must be > 0 for latency check to fire (no-data guard)
         }
         devs = _check_deviations(metrics)
         names = {d.metric_name for d in devs}
@@ -184,6 +185,7 @@ class TestStage1CheckDeviations:
             "signal_magnitude_mae": 0.5,
             "instrument_coverage_pct": 0.50,
             "latency_delta_ms": 9000.0,
+            "latency_samples": 5.0,  # must be > 0 for latency check to fire (no-data guard)
         }
         devs = _check_deviations(metrics)
         assert len(devs) == 4

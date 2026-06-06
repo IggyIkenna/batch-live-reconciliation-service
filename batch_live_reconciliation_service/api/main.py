@@ -10,6 +10,8 @@ from datetime import date
 from fastapi import FastAPI
 from unified_trading_library import make_health_router
 
+from ..api.resolution_api import router as resolution_router
+
 _last_processed_date: date | None = None
 
 
@@ -37,6 +39,8 @@ def create_app() -> FastAPI:
         data_freshness=_data_freshness,
     )
     app.include_router(health_router)
+    # Break-resolution endpoints (prefix /t1-recon) — consumed by the UI.
+    app.include_router(resolution_router)
     return app
 
 

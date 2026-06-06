@@ -38,6 +38,11 @@ class ExecutionThresholds:
     slippage_delta_bps_max: float = 10.0  # > 10 bps → alert
     algo_selection_accuracy_min: float = 0.99  # < 99% → alert
     order_latency_p99_ms_max: float = 600.0  # > 600ms (500ms gate + 100ms tolerance) → alert
+    # Absolute (not delta) recon green-gate bounds — composed with RECON_GREEN_THRESHOLDS
+    # per-archetype values in the orchestrator. Defaults track the most conservative
+    # carry_staked_basis archetype bound (drawdown 2.0% / fill_rate 0.95).
+    drawdown_pct_max: float = 2.0  # live drawdown > 2.0% → not green
+    fill_rate_min: float = 0.95  # live fill rate < 95% → not green
 
 
 @dataclass(frozen=True)
