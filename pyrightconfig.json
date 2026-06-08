@@ -1,8 +1,5 @@
 {
-  "include": [
-    "batch_live_reconciliation_service",
-    "tests"
-  ],
+  "include": ["batch_live_reconciliation_service", "tests"],
   "exclude": [
     "batch_live_reconciliation_service/stages/stage0_data_pipeline_recon.py",
     "tests",
