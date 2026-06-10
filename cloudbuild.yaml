@@ -39,6 +39,7 @@
 substitutions:
   _SERVICE_NAME: "batch-live-reconciliation-service"
   _REGISTRY_REPO: "unified-trading-system"
+  _PKG_NAME: "batch_live_reconciliation_service"
 
 steps:
   # ── Auth pre-check: fail fast if SA lacks AR access (before expensive build) ─
@@ -71,36 +72,15 @@ steps:
     args:
       - "-c"
       - |
-        VERSION=$(grep '^version' pyproject.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//')
-        [ -z "$$VERSION" ] && VERSION="$SHORT_SHA"
+        VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "//;s/"//')
         echo "$$VERSION" > /workspace/VERSION
         echo "Building version $$VERSION"
-    waitFor: ["-"]
-
-  # ── Clone unified-trading-pm for quality-gates WORKSPACE_ROOT resolution ──────
-  # quality-gates.sh sources base-service.sh from WORKSPACE_ROOT/unified-trading-pm;
-  # when CLOUD_BUILD=true, WORKSPACE_ROOT=/workspace; clone pm here so it exists.
-  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:alpine"
-    id: "clone-deps"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        set -e
-        GH_PAT=$$(gcloud secrets versions access latest --secret=GH_PAT --project=$PROJECT_ID 2>/dev/null || echo "")
-        if [ -z "$$GH_PAT" ]; then
-          echo "FAIL: GH_PAT not configured — cannot clone unified-trading-pm"; exit 1
-        fi
-        git clone --depth=1 --branch live-defi-rollout https://$$GH_PAT@github.com/IggyIkenna/unified-trading-pm.git unified-trading-pm
-        git clone --depth=1 --branch live-defi-rollout https://$$GH_PAT@github.com/IggyIkenna/deployment-service.git deployment-service
-        echo "unified-trading-pm + deployment-service cloned OK"
     waitFor: ["-"]
 
   # ── STEP 1: Configure Docker authentication ───────────────────────────────
   - name: "gcr.io/cloud-builders/gcloud"
     id: "configure-docker"
-    args:
-      ["auth", "configure-docker", "asia-northeast1-docker.pkg.dev", "--quiet"]
+    args: ["auth", "configure-docker", "asia-northeast1-docker.pkg.dev", "--quiet"]
     waitFor: ["-"]
 
   # ── STEP 2: Ensure Artifact Registry repository exists ───────────────────
@@ -122,13 +102,33 @@ steps:
     waitFor: ["-"]
 
   # ── STEP 3: Pull UTL base image (required for authenticated access) ───────
+  # DIGEST-AWARE (FROM-digest ratchet, 2026-06-10): when the Dockerfile carries a pinned
+  # `ARG BASE_IMAGE_DIGEST=sha256:<64-hex>` default, pre-pull THAT digest (authenticated CLI
+  # pull → docker caches the manifest under the digest ref → the in-build FROM @${...} hits
+  # cache). Without this, a pin one generation behind :latest forces a daemon-side registry
+  # pull which is UNAUTHENTICATED → "denied" (live incident: mtds builds a18c2981/bb37c7b9,
+  # 2026-06-10 — the very first digest-pinned builds). :latest is ALSO pulled so unpinned /
+  # legacy Dockerfiles keep working and the freshness comparison stays observable in logs.
   - name: "gcr.io/cloud-builders/docker"
     id: "pull-base-image"
+    entrypoint: "bash"
     args:
-      [
-        "pull",
-        "asia-northeast1-docker.pkg.dev/$PROJECT_ID/unified-trading-library/unified-trading-library:latest",
-      ]
+      - "-c"
+      - |
+        set -euo pipefail
+        # NOTE: double-dollar escapes shell vars from Cloud Build's OWN substitution pass
+        # (PROJECT_ID is deliberately single-dollar — it IS a Cloud Build substitution).
+        # The substitution validator scans this WHOLE block INCLUDING these comment lines,
+        # so even prose may not contain dollar-PIN/dollar-BASE (live incident 2026-06-10:
+        # the config was rejected twice — first for unescaped shell vars, then for the
+        # explanatory comment that mentioned them with dollars).
+        BASE="asia-northeast1-docker.pkg.dev/$PROJECT_ID/unified-trading-library/unified-trading-library"
+        PIN=$$(sed -n 's/^ARG BASE_IMAGE_DIGEST=\(sha256:[0-9a-f]\{64\}\).*/\1/p' Dockerfile | head -1 || true)
+        if [ -n "$$PIN" ]; then
+          echo "pinned base digest: $$PIN — pre-pulling the PINNED manifest"
+          docker pull "$${BASE}@$${PIN}"
+        fi
+        docker pull "$${BASE}:latest" || true
     waitFor: ["configure-docker"]
 
   # ── STEP 4: Build Docker image ────────────────────────────────────────────
@@ -139,17 +139,13 @@ steps:
       - "-c"
       - |
         VERSION=$(cat /workspace/VERSION 2>/dev/null || echo "$SHORT_SHA")
-        # Bundle cloud-providers.yaml so the container can resolve bucket names
-        # without a workspace (UNIFIED_TRADING_CLOUD_PROVIDERS_YAML set in Dockerfile).
-        mkdir -p configs
-        cp /workspace/deployment-service/configs/cloud-providers.yaml configs/cloud-providers.yaml
         docker build -f Dockerfile \
           --build-arg PROJECT_ID=$PROJECT_ID \
-          -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
           -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$SHORT_SHA \
+          -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
           -t asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:latest \
           .
-    waitFor: ["pull-base-image", "ensure-repo", "extract-version", "clone-deps"]
+    waitFor: ["pull-base-image", "ensure-repo", "extract-version"]
 
   # ── STEP 5: REQUIRED — Run quality gates INSIDE the image ─────────────────
   # CRITICAL: Use --entrypoint "" to clear the image's default ENTRYPOINT.
@@ -169,11 +165,6 @@ steps:
           -e CLOUD_BUILD=true \
           -e CLOUD_MOCK_MODE=true \
           -e GCP_PROJECT_ID=$PROJECT_ID \
-          -e WORKSPACE_ROOT=/workspace \
-          -e RUFF_CACHE_DIR=/tmp/ruff_cache \
-          -e DEPLOYMENT_ENV_SHORT=prod \
-          -e UNIFIED_TRADING_CLOUD_PROVIDERS_YAML=/workspace/deployment-service/configs/cloud-providers.yaml \
-          -v /workspace:/workspace:ro \
           asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION \
           /bin/bash -c "scripts/quality-gates.sh --no-fix --quick"
     waitFor: ["build"]
@@ -181,12 +172,7 @@ steps:
   # ── STEP 6: REQUIRED — Push image ONLY if quality gates passed ────────────
   - name: "gcr.io/cloud-builders/docker"
     id: "push"
-    args:
-      [
-        "push",
-        "--all-tags",
-        "asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}",
-      ]
+    args: ["push", "--all-tags", "asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}"]
     waitFor: ["quality-gates"]
 
   # ── STEP 7: REQUIRED — Vulnerability scan (CRITICAL CVE gate) ────────────
@@ -246,6 +232,28 @@ steps:
         fi
     waitFor: ["push"]
     allowFailure: true
+
+  # ── OPTIONAL: Publish Python wheel to Artifact Registry ───────────────────
+  # For services that are also imported as libraries by other services.
+  # Remove this step if the service has no cross-service Python imports.
+  - name: "python:3.13-slim"
+    id: "publish-wheel"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -e
+        pip install uv
+        python -m pip install --no-cache-dir build twine keyrings.google-artifactregistry-auth
+        mkdir -p /root/.config/pip
+        echo "[global]
+        extra-index-url = https://asia-northeast1-python.pkg.dev/$PROJECT_ID/unified-libraries/simple/" \
+          > /root/.config/pip/pip.conf
+        python -m build --wheel --outdir dist/
+        python -m twine upload \
+          --repository-url https://asia-northeast1-python.pkg.dev/$PROJECT_ID/unified-libraries/ \
+          --non-interactive dist/*.whl || true
+    waitFor: ["quality-gates"]
 
 images:
   - "asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$SHORT_SHA"
