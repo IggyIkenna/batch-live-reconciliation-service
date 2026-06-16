@@ -38,9 +38,11 @@ from batch_live_reconciliation_service.models.recon_report import (
 logger = logging.getLogger(__name__)
 
 # PipelineMode values use source-specific strings (e.g. "batch_tardis",
-# "batch_databento", "live_websocket"). Batch = any value starting with
-# "batch_"; live = the single "live_websocket" value.
-_PIPELINE_MODE_LIVE_VALUE = "live_websocket"
+# "batch_databento", "live_binance", "live_hyperliquid"). Both modes are
+# identified by string prefix: batch = any "batch_*" value; live = any
+# "live_*" value. This prefix match covers both the transitional alias on
+# old parquets and all new "live_<source>" values written post-M1.
+_PIPELINE_MODE_LIVE_PREFIX = "live_"
 _PIPELINE_MODE_BATCH_PREFIX = "batch_"
 
 
@@ -50,8 +52,12 @@ def _is_batch_mode(mode: str) -> bool:
 
 
 def _is_live_mode(mode: str) -> bool:
-    """True for live_websocket pipeline_mode."""
-    return mode == _PIPELINE_MODE_LIVE_VALUE
+    """True for any live-source pipeline_mode (e.g. live_binance, live_hyperliquid).
+
+    Uses a prefix match so both the legacy transitional alias on old parquets
+    and new ``live_<source>`` values written post-M1 are handled correctly.
+    """
+    return bool(mode) and mode.startswith(_PIPELINE_MODE_LIVE_PREFIX)
 
 
 @dataclass
