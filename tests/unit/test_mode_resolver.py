@@ -87,14 +87,18 @@ def test_resolve_read_mode_no_recognised_mode_raises() -> None:
 
 
 def test_legacy_transitional_alias_still_resolves_to_live_mode() -> None:
-    """Backward-compat: old parquets carry the transitional alias (live_ + websocket).
+    """Backward-compat: old parquets carry the retired transitional alias (live_ + websocket).
 
-    The PipelineMode enum member still exists (it is deleted in a LATER orchestrator
-    step). Until deletion, mode_for_pipeline_mode_value must map it to Mode.LIVE.
+    The PipelineMode enum member has been DELETED (the source-aware ``live_<source>``
+    migration landed), so constructing ``PipelineMode`` from the retired alias string now
+    raises — but old parquet
+    rows still carry the string. ``mode_for_pipeline_mode_value`` must still map it to
+    Mode.LIVE (via the leading-``live_`` prefix fallback), never drop it from the
+    reconciliation mode-set.
 
-    The alias string is constructed at runtime via concatenation so that the grep
-    gate (zero bare alias tokens in source) stays satisfied while the runtime still
-    exercises the transitional enum path.
+    The alias string is constructed at runtime via concatenation so the grep gate
+    (zero bare alias tokens in source) stays satisfied while the runtime still exercises
+    the legacy-string path.
     """
-    legacy_value = "live_" + "websocket"  # backward-compat: transitional enum alias
+    legacy_value = "live_" + "websocket"  # backward-compat: retired transitional alias string
     assert mode_for_pipeline_mode_value(legacy_value) == Mode.LIVE
