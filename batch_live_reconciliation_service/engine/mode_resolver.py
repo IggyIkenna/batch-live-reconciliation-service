@@ -32,7 +32,7 @@ def mode_for_pipeline_mode_value(pipeline_mode_value: str) -> Mode:
     """Map a raw manifest ``pipeline_mode`` column value to its abstract :class:`Mode`.
 
     The manifest stores ``pipeline_mode`` as a closed-set string (e.g. ``batch_tardis``,
-    ``live_websocket``, ``replay_databento``). This resolves it to the abstract
+    ``live_binance``, ``replay_databento``). This resolves it to the abstract
     :class:`Mode` via the UAC closed set — never by ad-hoc prefix string matching, so
     the mode axis stays bound to the UAC SSOT.
 
