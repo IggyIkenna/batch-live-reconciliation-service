@@ -32,13 +32,29 @@ def mode_for_pipeline_mode_value(pipeline_mode_value: str) -> Mode:
     """Map a raw manifest ``pipeline_mode`` column value to its abstract :class:`Mode`.
 
     The manifest stores ``pipeline_mode`` as a closed-set string (e.g. ``batch_tardis``,
-    ``live_binance``, ``replay_databento``). This resolves it to the abstract
-    :class:`Mode` via the UAC closed set — never by ad-hoc prefix string matching, so
-    the mode axis stays bound to the UAC SSOT.
+    ``live_binance``, ``replay_databento``). A CURRENT value resolves via the UAC closed
+    set (:func:`mode_of` ∘ :class:`PipelineMode`), so the mode axis stays bound to the UAC
+    SSOT.
 
-    :raises ValueError: if ``pipeline_mode_value`` is not a known :class:`PipelineMode`.
+    OLD parquets, however, still carry RETIRED ``pipeline_mode`` strings that are no longer
+    :class:`PipelineMode` members — e.g. the transitional ``live_`` + ``websocket`` alias
+    removed when the source-aware ``live_<source>`` migration landed. Constructing
+    ``PipelineMode(value)`` on those raises ``ValueError``; we MUST NOT let the row drop out
+    of the reconciliation mode-set (that is silent data loss), so a retired value falls back
+    to a leading-``{mode}_`` STRING prefix match (``live*`` → LIVE / ``replay*`` → REPLAY /
+    ``batch*`` → BATCH). A genuinely-unparseable value still raises.
+
+    :raises ValueError: if ``pipeline_mode_value`` is neither a known :class:`PipelineMode`
+        nor a recognised ``{mode}_`` prefix.
     """
-    return mode_of(PipelineMode(pipeline_mode_value))
+    try:
+        return mode_of(PipelineMode(pipeline_mode_value))
+    except ValueError:
+        normalised = pipeline_mode_value.strip().lower()
+        for prefix, mode in (("batch", Mode.BATCH), ("live", Mode.LIVE), ("replay", Mode.REPLAY)):
+            if normalised.startswith(prefix):
+                return mode
+        raise
 
 
 def available_modes_from_pipeline_mode_values(
