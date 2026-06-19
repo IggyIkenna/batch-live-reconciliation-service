@@ -664,7 +664,7 @@ class TestResolutionAPI:
 
         from batch_live_reconciliation_service.api.resolution_api import list_breaks
 
-        result = asyncio.get_event_loop().run_until_complete(list_breaks())
+        result = asyncio.run(list_breaks())
         assert len(result) >= 2
 
     def test_list_breaks_filter_by_venue(self) -> None:
@@ -672,7 +672,7 @@ class TestResolutionAPI:
 
         from batch_live_reconciliation_service.api.resolution_api import list_breaks
 
-        result = asyncio.get_event_loop().run_until_complete(list_breaks(venue="Binance"))
+        result = asyncio.run(list_breaks(venue="Binance"))
         for brk in result:
             assert brk.venue.lower() == "binance"
 
@@ -681,7 +681,7 @@ class TestResolutionAPI:
 
         from batch_live_reconciliation_service.api.resolution_api import list_breaks
 
-        result = asyncio.get_event_loop().run_until_complete(list_breaks(break_type="pnl"))
+        result = asyncio.run(list_breaks(break_type="pnl"))
         for brk in result:
             assert brk.break_type == "pnl"
 
@@ -690,7 +690,7 @@ class TestResolutionAPI:
 
         from batch_live_reconciliation_service.api.resolution_api import list_breaks
 
-        result = asyncio.get_event_loop().run_until_complete(list_breaks(status="resolved"))
+        result = asyncio.run(list_breaks(status="resolved"))
         for brk in result:
             assert brk.status == "resolved"
 
@@ -708,7 +708,7 @@ class TestResolutionAPI:
             resolved_by="test-user",
             note="Expected divergence from funding rates",
         )
-        result = asyncio.get_event_loop().run_until_complete(resolve_break(resolution))
+        result = asyncio.run(resolve_break(resolution))
         assert result.break_id == "BRK-001"
         assert result.status == "resolved"
         assert result.action == "accept"
@@ -728,7 +728,7 @@ class TestResolutionAPI:
             resolved_by="test-user",
             note="Needs further investigation here",
         )
-        result = asyncio.get_event_loop().run_until_complete(resolve_break(resolution))
+        result = asyncio.run(resolve_break(resolution))
         assert result.status == "investigating"
         _resolutions.clear()
 
@@ -746,7 +746,7 @@ class TestResolutionAPI:
             resolved_by="ops-user",
             note="Break requires correction booking",
         )
-        result = asyncio.get_event_loop().run_until_complete(resolve_break(resolution))
+        result = asyncio.run(resolve_break(resolution))
         assert result.status == "resolved"
         _resolutions.clear()
 
@@ -765,7 +765,7 @@ class TestResolutionAPI:
             note="some note here",
         )
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.get_event_loop().run_until_complete(resolve_break(resolution))
+            asyncio.run(resolve_break(resolution))
         assert exc_info.value.status_code == 404
 
     def test_book_correction_positive_delta_is_buy(self) -> None:
@@ -774,7 +774,7 @@ class TestResolutionAPI:
         from batch_live_reconciliation_service.api.resolution_api import BookCorrectionRequest, book_correction
 
         request = BookCorrectionRequest(break_id="BRK-001")
-        result = asyncio.get_event_loop().run_until_complete(book_correction(request))
+        result = asyncio.run(book_correction(request))
         assert result.side == "BUY"
         assert result.venue == "Binance"
         assert result.instrument_id == "BTC-USDT"
@@ -807,7 +807,7 @@ class TestResolutionAPI:
         ra._MOCK_BREAKS.append(neg_break)
         try:
             request = BookCorrectionRequest(break_id="BRK-NEG")
-            result = asyncio.get_event_loop().run_until_complete(book_correction(request))
+            result = asyncio.run(book_correction(request))
             assert result.side == "SELL"
             assert result.quantity == pytest.approx(2.0)
         finally:
@@ -823,7 +823,7 @@ class TestResolutionAPI:
 
         request = BookCorrectionRequest(break_id="DOES-NOT-EXIST")
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.get_event_loop().run_until_complete(book_correction(request))
+            asyncio.run(book_correction(request))
         assert exc_info.value.status_code == 404
 
     def test_list_breaks_with_resolution_shows_updated_status(self) -> None:
@@ -841,9 +841,9 @@ class TestResolutionAPI:
             resolved_by="tester",
             note="Test resolution note here",
         )
-        asyncio.get_event_loop().run_until_complete(ra.resolve_break(resolution))
+        asyncio.run(ra.resolve_break(resolution))
 
-        breaks = asyncio.get_event_loop().run_until_complete(ra.list_breaks())
+        breaks = asyncio.run(ra.list_breaks())
         brk_001 = next((b for b in breaks if b.break_id == "BRK-001"), None)
         assert brk_001 is not None
         assert brk_001.status == "accept"
