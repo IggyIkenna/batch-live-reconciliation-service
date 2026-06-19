@@ -1,4 +1,4 @@
-"""Trade-by-trade ``reconcile_week`` determinism harness (Phase 4 P4.1).
+"""Trade-by-trade ``reconcile_day`` determinism harness (Phase 4 P4.1).
 
 Implements the determinism PROOF for paper⟷batch and the execution-alpha
 measurement for live⟷paper, per the codex SSOT
@@ -22,11 +22,11 @@ from datetime import datetime
 from decimal import Decimal
 
 from unified_api_contracts.internal import (
+    DailyReconReport,
     DeterminismBugClass,
     ReconVerdictType,
     TradeDeviation,
     TradeFillRecord,
-    WeeklyReconReport,
 )
 
 _BPS = Decimal(10000)
@@ -112,7 +112,7 @@ def _classify_determinism(
     return False, DeterminismBugClass.NON_DETERMINISM
 
 
-def reconcile_week(
+def reconcile_day(
     run_a_id: str,
     run_b_id: str,
     records_a: Sequence[TradeFillRecord],
@@ -120,7 +120,7 @@ def reconcile_week(
     verdict_type: ReconVerdictType,
     window_start: datetime,
     window_end: datetime,
-) -> WeeklyReconReport:
+) -> DailyReconReport:
     """Reconcile two runs trade-by-trade over a window.
 
     Matches on ``trade_key``. For a DETERMINISM verdict the result is the binary
@@ -138,7 +138,7 @@ def reconcile_week(
         window_end: Reconciliation window end (UTC).
 
     Returns:
-        A populated ``WeeklyReconReport``.
+        A populated ``DailyReconReport``.
 
     Raises:
         ValueError: A duplicate ``trade_key`` within a single run's records.
@@ -177,7 +177,7 @@ def reconcile_week(
     # Deterministic output ordering for reproducibility.
     deviations.sort(key=lambda d: d.trade_key)
 
-    return WeeklyReconReport(
+    return DailyReconReport(
         verdict_type=verdict_type,
         run_a_id=run_a_id,
         run_b_id=run_b_id,
