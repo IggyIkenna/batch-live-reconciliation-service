@@ -12,13 +12,13 @@ COPY batch_live_reconciliation_service/ ./batch_live_reconciliation_service/
 COPY scripts/ ./scripts/
 COPY tests/ ./tests/
 COPY cloudbuild.yaml ./
-# cloud-providers.yaml copied from deployment-service by cloudbuild.yaml build step
-COPY configs/cloud-providers.yaml ./configs/cloud-providers.yaml
+# cloud-providers.yaml is UAC-packaged since 2026-06-10 (unified_api_contracts/config/) and read
+# via importlib.resources as the always-available default — no local COPY/ENV needed (the prior
+# COPY referenced a configs/ dir absent from the build context → build broke; mtds/instruments
+# carry no such COPY). SSOT: CLAUDE.md § Bucket-name SSOT.
 
 # --no-deps: UTL base image pre-installs unified-trading-library and
 # unified-api-contracts; avoids needing local path deps in build context.
 RUN uv pip install --system -e . --no-deps
-
-ENV UNIFIED_TRADING_CLOUD_PROVIDERS_YAML=/app/batch-live-reconciliation-service/configs/cloud-providers.yaml
 
 ENTRYPOINT ["python", "-m", "batch_live_reconciliation_service"]
