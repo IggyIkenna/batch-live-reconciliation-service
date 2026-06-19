@@ -190,3 +190,71 @@ def test_timing_delta_ms_is_signed_milliseconds() -> None:
     (dev,) = report.deviations
     assert dev.timing_delta_ms == pytest.approx(250.0)
     assert dev.fees_delta == Decimal("0.15")
+
+
+def test_corrected_passive_bbo_benchmark_reconciles_deterministically() -> None:
+    """Determinism proof for the strategy-service PASSIVE_BBO correction (plan P1.1).
+
+    The strategy-service ``BenchmarkFillEngine`` now prices PASSIVE_BBO via the
+    UAC pricing SSOT (``_passive_bbo``: ``bid if side > 0 else ask``) — the
+    CORRECT passive-maker convention (a LONG maker buys at the BID, a SHORT maker
+    sells at the ASK). Previously the engine mapped LONG→ask / SHORT→bid, a
+    latent paper-vs-batch fill drift. Since BOTH paper and a batch-rerun price the
+    benchmark through that single SSOT, the two runs produce IDENTICAL fills:
+    ε = 0, the determinism PROOF holds. The fixture encodes the corrected prices
+    (bid 49990 for the LONG, ask 50010 for the SHORT) on both sides.
+    """
+
+    bid = "49990.0"  # corrected: LONG passive maker fills at the bid
+    ask = "50010.0"  # corrected: SHORT passive maker fills at the ask
+    paper = [
+        _fill("long-1", side="BUY", fill_price=bid),
+        _fill("short-1", side="SELL", fill_price=ask),
+    ]
+    # The batch rerun replays the same captured snapshot through the same UAC
+    # benchmark pricing SSOT → byte-identical benchmark prices.
+    batch = [
+        _fill("long-1", side="BUY", fill_price=bid),
+        _fill("short-1", side="SELL", fill_price=ask),
+    ]
+    report = reconcile_day(
+        "paper-passive-bbo",
+        "batch-passive-bbo",
+        paper,
+        batch,
+        ReconVerdictType.DETERMINISM,
+        _WINDOW_START,
+        _WINDOW_END,
+    )
+
+    assert report.is_deterministic is True
+    assert report.determinism_bug_class is DeterminismBugClass.NONE
+    assert report.matched == 2
+    assert report.unmatched_a == 0
+    assert report.unmatched_b == 0
+    assert all(dev.fill_price_delta_bps == Decimal("0") for dev in report.deviations)
+
+
+def test_passive_bbo_drift_is_a_fill_model_bug() -> None:
+    """If paper kept the OLD LONG→ask convention while batch uses the corrected
+    LONG→bid, ``reconcile_day`` catches it as a FILL_MODEL_DRIFT bug (not ε=0).
+
+    This is the exact paper-sim ≠ batch-sim divergence the determinism spine
+    exists to surface — the harness must classify it, never accept it as
+    "within tolerance".
+    """
+
+    paper_old_convention = [_fill("long-1", side="BUY", fill_price="50010.0")]  # OLD: LONG→ask
+    batch_corrected = [_fill("long-1", side="BUY", fill_price="49990.0")]  # corrected: LONG→bid
+    report = reconcile_day(
+        "paper-old",
+        "batch-corrected",
+        paper_old_convention,
+        batch_corrected,
+        ReconVerdictType.DETERMINISM,
+        _WINDOW_START,
+        _WINDOW_END,
+    )
+
+    assert report.is_deterministic is False
+    assert report.determinism_bug_class is DeterminismBugClass.FILL_MODEL_DRIFT
