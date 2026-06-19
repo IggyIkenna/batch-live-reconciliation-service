@@ -18,6 +18,9 @@ import logging
 
 from unified_trading_library import BaseModeHandler, ServiceBootstrap, UnifiedServiceHandler
 
+from batch_live_reconciliation_service.cli.handlers.daily_determinism_handler import (
+    DailyDeterminismHandler,
+)
 from batch_live_reconciliation_service.cli.handlers.reconcile_handler import ReconcileHandler
 from batch_live_reconciliation_service.engine.mock_data_provider import run_mock_pipeline
 
@@ -26,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 _OPERATIONS: dict[str, type[BaseModeHandler] | type[UnifiedServiceHandler]] = {
     "reconcile": ReconcileHandler,
+    "daily-determinism": DailyDeterminismHandler,
 }
 
 

@@ -883,7 +883,7 @@ class TestReconcileHandler:
 
         handler = ReconcileHandler.__new__(ReconcileHandler)
         handler.args = None  # type: ignore[attr-defined]
-        result = asyncio.get_event_loop().run_until_complete(handler.run())
+        result = asyncio.run(handler.run())
         assert result["status"] == "error"
 
     def test_run_dry_run_returns_ok_or_error(self) -> None:
@@ -904,7 +904,7 @@ class TestReconcileHandler:
             "batch_live_reconciliation_service.cli.handlers.reconcile_handler.run_reconciliation",
             return_value=mock_report,
         ):
-            result = asyncio.get_event_loop().run_until_complete(
+            result = asyncio.run(
                 handler.run()  # type: ignore[union-attr]
             )
 
@@ -930,7 +930,7 @@ class TestReconcileHandler:
             "batch_live_reconciliation_service.cli.handlers.reconcile_handler.run_reconciliation",
             return_value=mock_report,
         ):
-            result = asyncio.get_event_loop().run_until_complete(
+            result = asyncio.run(
                 handler.run()  # type: ignore[union-attr]
             )
 
@@ -965,7 +965,7 @@ class TestReconcileHandler:
             "batch_live_reconciliation_service.cli.handlers.reconcile_handler.run_reconciliation",
             side_effect=mock_run,
         ):
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 handler.run()  # type: ignore[union-attr]
             )
 
