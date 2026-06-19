@@ -40,6 +40,15 @@ class ReconConfig(UnifiedCloudConfig):
     # Account id used to query the strategy-service pnl-series baseline in Stage 2.
     strategy_account_id: str = "odum-live"
 
+    # Alerting-service base URL — POST target for the daily T+1 determinism recon
+    # verdict (P6). The recon alert client posts a UAC AlertEvent JSON to
+    # {url}/api/v1/alerts/rules/recent. When unset, the verdict is logged only
+    # (no HTTP post). NEVER an import of alerting-service (service↔service ban).
+    alerting_service_url: str = ""
+
+    # Slack channel target for the daily T+1 recon verdict (P6).
+    recon_alert_channel: str = "#uts-live-alerts"
+
     # Cloud Run Job timeout per stage (seconds)
     stage_timeout_seconds: int = 1800  # 30 minutes
 
