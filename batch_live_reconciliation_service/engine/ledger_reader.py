@@ -88,9 +88,9 @@ def _instrument_key_from_row(row: dict[str, object]) -> str:
     explicit = row.get("instrument_key")
     if isinstance(explicit, str) and explicit:
         return explicit
-    venue = str(row.get("venue", ""))
-    instrument_type = str(row.get("asset_class", row.get("instrument_type", "")))
-    symbol = str(row.get("asset_symbol", row.get("underlying", "")))
+    venue = str(row.get("venue", ""))  # noqa: qg-empty-fallback  # legacy rows may omit venue; empty yields valid composite key
+    instrument_type = str(row.get("asset_class", row.get("instrument_type", "")))  # noqa: qg-empty-fallback  # legacy rows may omit asset_class/instrument_type
+    symbol = str(row.get("asset_symbol", row.get("underlying", "")))  # noqa: qg-empty-fallback  # legacy rows may omit asset_symbol/underlying
     return f"{venue}:{instrument_type}:{symbol}"
 
 
@@ -103,9 +103,10 @@ def _parse_decimal(value: object, *, field: str, trade_id: str) -> Decimal:
 
 def _row_to_fill(row: dict[str, object]) -> TradeFillRecord:
     """Convert a single ``event_type=trade`` ledger row dict to ``TradeFillRecord``."""
-    trade_id = str(row.get("trade_id", ""))
-    if not trade_id:
+    trade_id_raw = row.get("trade_id")
+    if not trade_id_raw:
         raise ValueError("instruction-ledger trade row missing trade_id (the trade_key)")
+    trade_id = str(trade_id_raw)
 
     qty_delta = _parse_decimal(row.get("delta"), field="delta", trade_id=trade_id)
     price = _parse_decimal(row.get("price"), field="price", trade_id=trade_id)
@@ -131,7 +132,7 @@ def _row_to_fill(row: dict[str, object]) -> TradeFillRecord:
         instrument_key=_instrument_key_from_row(row),
         strategy_instruction_id=strategy_instruction_id,
         tick_timestamp=tick_timestamp,
-        venue=str(row.get("venue", "")),
+        venue=str(row.get("venue", "")),  # noqa: qg-empty-fallback  # venue optional in TradeFillRecord; instrument_key carries it
         side=_side_from_row(row, qty_delta),
         qty=abs(qty_delta),
         fill_price=price,
@@ -178,7 +179,7 @@ def load_instruction_ledger_fills(ledger_root: str) -> list[TradeFillRecord]:
             if not stripped:
                 continue
             row = cast(dict[str, object], json.loads(stripped))
-            if str(row.get("event_type", "")) != _TRADE_EVENT_TYPE:
+            if str(row.get("event_type", "")) != _TRADE_EVENT_TYPE:  # noqa: qg-empty-fallback  # empty safely != "trade"; guards rows without event_type
                 continue
             fills.append(_row_to_fill(row))
 
