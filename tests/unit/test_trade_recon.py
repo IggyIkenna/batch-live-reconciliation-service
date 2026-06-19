@@ -1,4 +1,4 @@
-"""Unit tests for the trade-by-trade ``reconcile_week`` determinism harness (P4.1).
+"""Unit tests for the trade-by-trade ``reconcile_day`` determinism harness (P4.1).
 
 Credential-free. Exercises the verdict semantics from the codex SSOT
 ``paper-batch-live-reconciliation.md`` §4.5 + §6: the paper⟷batch DETERMINISM
@@ -19,7 +19,7 @@ from unified_api_contracts.internal import (
     TradeFillRecord,
 )
 
-from batch_live_reconciliation_service.engine.trade_recon import reconcile_week
+from batch_live_reconciliation_service.engine.trade_recon import reconcile_day
 
 _WINDOW_START = datetime(2026, 6, 19, 0, 0, 0, tzinfo=UTC)
 _WINDOW_END = datetime(2026, 6, 26, 0, 0, 0, tzinfo=UTC)
@@ -53,7 +53,7 @@ def _fill(
 def test_identical_runs_are_deterministic() -> None:
     """(a) Two identical runs → is_deterministic True, bug NONE, ε = 0."""
     records = [_fill("t1"), _fill("t2", fill_price="200.0")]
-    report = reconcile_week(
+    report = reconcile_day(
         "paper-1",
         "batch-1",
         records,
@@ -80,7 +80,7 @@ def test_price_diff_is_fill_model_drift() -> None:
     # 100.0 -> 100.125 == +12.5 bps.
     a = [_fill("t1", fill_price="100.0")]
     b = [_fill("t1", fill_price="100.125")]
-    report = reconcile_week("paper-1", "batch-1", a, b, ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "batch-1", a, b, ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
 
     assert report.is_deterministic is False
     assert report.determinism_bug_class == DeterminismBugClass.FILL_MODEL_DRIFT
@@ -97,7 +97,7 @@ def test_unmatched_trade_is_input_capture_gap() -> None:
     """(c) Trade present in A but not B → unmatched_a=1, INPUT_CAPTURE_GAP, not deterministic."""
     a = [_fill("t1"), _fill("t2")]
     b = [_fill("t1")]
-    report = reconcile_week("paper-1", "batch-1", a, b, ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "batch-1", a, b, ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
 
     assert report.is_deterministic is False
     assert report.determinism_bug_class == DeterminismBugClass.INPUT_CAPTURE_GAP
@@ -116,7 +116,7 @@ def test_side_flip_is_non_determinism() -> None:
     """(d) Same trades + identical fills but a side flip → NON_DETERMINISM."""
     a = [_fill("t1", side="BUY")]
     b = [_fill("t1", side="SELL")]
-    report = reconcile_week("paper-1", "batch-1", a, b, ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "batch-1", a, b, ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
 
     assert report.is_deterministic is False
     assert report.determinism_bug_class == DeterminismBugClass.NON_DETERMINISM
@@ -138,7 +138,7 @@ def test_execution_verdict_populates_alpha_rollups() -> None:
         _fill("t1", fill_price="100.05", fill_model=FillModel.LIVE_VENUE),  # +5 bps
         _fill("t2", fill_price="200.30", fill_model=FillModel.LIVE_VENUE),  # +15 bps
     ]
-    report = reconcile_week("paper-1", "live-1", a, b, ReconVerdictType.EXECUTION, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "live-1", a, b, ReconVerdictType.EXECUTION, _WINDOW_START, _WINDOW_END)
 
     assert report.is_deterministic is False
     assert report.determinism_bug_class == DeterminismBugClass.NONE
@@ -153,7 +153,7 @@ def test_composite_verdict_is_not_a_bug() -> None:
     """COMPOSITE verdict also reports execution alpha (bug NONE, not deterministic)."""
     a = [_fill("t1", fill_price="100.0")]
     b = [_fill("t1", fill_price="100.10")]  # +10 bps
-    report = reconcile_week("paper-1", "live-1", a, b, ReconVerdictType.COMPOSITE, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "live-1", a, b, ReconVerdictType.COMPOSITE, _WINDOW_START, _WINDOW_END)
 
     assert report.is_deterministic is False
     assert report.determinism_bug_class == DeterminismBugClass.NONE
@@ -164,14 +164,14 @@ def test_duplicate_trade_key_raises() -> None:
     """(f) Duplicate trade_key within a single run raises ValueError."""
     dupes = [_fill("t1"), _fill("t1", fill_price="105.0")]
     with pytest.raises(ValueError, match="Duplicate trade_key"):
-        reconcile_week(
+        reconcile_day(
             "paper-1", "batch-1", dupes, [_fill("t1")], ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END
         )
 
 
 def test_empty_inputs_are_trivially_deterministic() -> None:
     """(g) Empty inputs → deterministic True (0 trades match trivially)."""
-    report = reconcile_week("paper-1", "batch-1", [], [], ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "batch-1", [], [], ReconVerdictType.DETERMINISM, _WINDOW_START, _WINDOW_END)
 
     assert report.is_deterministic is True
     assert report.determinism_bug_class == DeterminismBugClass.NONE
@@ -185,8 +185,76 @@ def test_timing_delta_ms_is_signed_milliseconds() -> None:
     """timing_delta_ms = (b - a) in milliseconds; fees_delta is additive."""
     a = [_fill("t1", fees="0.10", tick=_TICK)]
     b = [_fill("t1", fees="0.25", tick=_TICK + timedelta(milliseconds=250))]
-    report = reconcile_week("paper-1", "live-1", a, b, ReconVerdictType.EXECUTION, _WINDOW_START, _WINDOW_END)
+    report = reconcile_day("paper-1", "live-1", a, b, ReconVerdictType.EXECUTION, _WINDOW_START, _WINDOW_END)
 
     (dev,) = report.deviations
     assert dev.timing_delta_ms == pytest.approx(250.0)
     assert dev.fees_delta == Decimal("0.15")
+
+
+def test_corrected_passive_bbo_benchmark_reconciles_deterministically() -> None:
+    """Determinism proof for the strategy-service PASSIVE_BBO correction (plan P1.1).
+
+    The strategy-service ``BenchmarkFillEngine`` now prices PASSIVE_BBO via the
+    UAC pricing SSOT (``_passive_bbo``: ``bid if side > 0 else ask``) — the
+    CORRECT passive-maker convention (a LONG maker buys at the BID, a SHORT maker
+    sells at the ASK). Previously the engine mapped LONG→ask / SHORT→bid, a
+    latent paper-vs-batch fill drift. Since BOTH paper and a batch-rerun price the
+    benchmark through that single SSOT, the two runs produce IDENTICAL fills:
+    ε = 0, the determinism PROOF holds. The fixture encodes the corrected prices
+    (bid 49990 for the LONG, ask 50010 for the SHORT) on both sides.
+    """
+
+    bid = "49990.0"  # corrected: LONG passive maker fills at the bid
+    ask = "50010.0"  # corrected: SHORT passive maker fills at the ask
+    paper = [
+        _fill("long-1", side="BUY", fill_price=bid),
+        _fill("short-1", side="SELL", fill_price=ask),
+    ]
+    # The batch rerun replays the same captured snapshot through the same UAC
+    # benchmark pricing SSOT → byte-identical benchmark prices.
+    batch = [
+        _fill("long-1", side="BUY", fill_price=bid),
+        _fill("short-1", side="SELL", fill_price=ask),
+    ]
+    report = reconcile_day(
+        "paper-passive-bbo",
+        "batch-passive-bbo",
+        paper,
+        batch,
+        ReconVerdictType.DETERMINISM,
+        _WINDOW_START,
+        _WINDOW_END,
+    )
+
+    assert report.is_deterministic is True
+    assert report.determinism_bug_class is DeterminismBugClass.NONE
+    assert report.matched == 2
+    assert report.unmatched_a == 0
+    assert report.unmatched_b == 0
+    assert all(dev.fill_price_delta_bps == Decimal("0") for dev in report.deviations)
+
+
+def test_passive_bbo_drift_is_a_fill_model_bug() -> None:
+    """If paper kept the OLD LONG→ask convention while batch uses the corrected
+    LONG→bid, ``reconcile_day`` catches it as a FILL_MODEL_DRIFT bug (not ε=0).
+
+    This is the exact paper-sim ≠ batch-sim divergence the determinism spine
+    exists to surface — the harness must classify it, never accept it as
+    "within tolerance".
+    """
+
+    paper_old_convention = [_fill("long-1", side="BUY", fill_price="50010.0")]  # OLD: LONG→ask
+    batch_corrected = [_fill("long-1", side="BUY", fill_price="49990.0")]  # corrected: LONG→bid
+    report = reconcile_day(
+        "paper-old",
+        "batch-corrected",
+        paper_old_convention,
+        batch_corrected,
+        ReconVerdictType.DETERMINISM,
+        _WINDOW_START,
+        _WINDOW_END,
+    )
+
+    assert report.is_deterministic is False
+    assert report.determinism_bug_class is DeterminismBugClass.FILL_MODEL_DRIFT
