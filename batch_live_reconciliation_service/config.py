@@ -49,6 +49,15 @@ class ReconConfig(UnifiedCloudConfig):
     # Slack channel target for the daily T+1 recon verdict (P6).
     recon_alert_channel: str = "#uts-live-alerts"
 
+    # Ledger roots for the daily-determinism stage (P7.1-B). The paper run's
+    # ledger_root (run A, the reference) and the batch rerun's ledger_root
+    # (run B); each holds its run_manifest.json + InstructionLedger JSONL. The
+    # cron sets these from the prior day's paper run + its batch rerun. The
+    # handler reads each RunManifest from these roots, runs reconcile_day, and
+    # POSTs the DETERMINISM verdict. Empty → the stage logs "no run configured".
+    paper_ledger_root: str = ""
+    batch_ledger_root: str = ""
+
     # Cloud Run Job timeout per stage (seconds)
     stage_timeout_seconds: int = 1800  # 30 minutes
 
