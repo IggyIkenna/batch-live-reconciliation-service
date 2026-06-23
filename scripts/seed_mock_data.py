@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Epic: batch_live_symmetry_master
+# Lifecycle: permanent
+# Delete-when: NA
 """Generate mock reconciliation data for local dev / CI mock mode.
 
 batch-live-reconciliation-service is Layer 7 (monitoring/reconciliation) of the
