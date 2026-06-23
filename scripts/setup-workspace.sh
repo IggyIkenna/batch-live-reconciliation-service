@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Epic: batch_live_symmetry_master
+# Lifecycle: permanent
+# Delete-when: NA
 #
 # setup-workspace.sh — batch-live-reconciliation-service
 #
