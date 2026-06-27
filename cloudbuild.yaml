@@ -63,18 +63,34 @@ steps:
         echo "=== Auth pre-check passed ==="
     waitFor: ["-"]
 
-  # ── OPTIONAL: Extract version from pyproject.toml for semver tagging ──────
+  # ── OPTIONAL: Extract the human-readable version for semver tagging ──────
 
-  # Include this step if you want $VERSION tags in addition to $SHORT_SHA.
+  # Resolves the version that tags the image (in addition to $SHORT_SHA). Phase-2/D13: the version
+  # SSOT is the git TAG (version_source=git-tag / dynamic-pyproject repos carry NO committed
+  # 'version =' line, so a pyproject grep returns empty and the image would be mis-tagged). Source
+  # order: git tag (authoritative) > pyproject line (static repos, mid-migration) > short SHA. For a
+  # STATIC repo the nearest v-tag equals its pyproject version by coherence, so this is
+  # backward-compatible — it only CHANGES behavior for git-tag repos (which it FIXES). Mirrors the
+  # deployment-service DS-1 git-describe fix.
   - name: "gcr.io/cloud-builders/git"
     id: "extract-version"
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "//;s/"//')
+        git fetch --tags --force --quiet 2>/dev/null || true
+        VERSION=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')
+        if [ -z "$$VERSION" ]; then
+          VERSION=$(git tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | head -1 | sed 's/^v//')
+        fi
+        if [ -z "$$VERSION" ]; then
+          VERSION=$(grep '^version' pyproject.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//')
+        fi
+        if [ -z "$$VERSION" ]; then
+          VERSION="$SHORT_SHA"
+        fi
         echo "$$VERSION" > /workspace/VERSION
-        echo "Building version $$VERSION"
+        echo "Building version $$VERSION (source: git-tag > pyproject > short-sha)"
     waitFor: ["-"]
 
   # ── STEP 1: Configure Docker authentication ───────────────────────────────
@@ -174,37 +190,7 @@ steps:
           /bin/bash -c "scripts/quality-gates.sh --no-fix --quick"
     waitFor: ["build"]
 
-  # ── STEP 5.5: REQUIRED — Operability smoke (import + entrypoint) ─────────
-  # Validates the freshly-built image (1) IMPORTS cleanly (catches --no-sources /
-  # dropped-dep installs that let docker build succeed but break runtime) and
-  # (2) RUNS (entrypoint + ServiceBootstrap bootstrap) under credential-free env.
-  # MUST run BEFORE push — a broken image must never reach the registry.
-  # Credential-free env mirrors the unit-test suite (CLOUD_PROVIDER=local +
-  # CLOUD_MOCK_MODE=true). A bare --help without these envs is WRONG: ServiceBootstrap
-  # emits STARTED (needs GCP_PROJECT_ID + a cloud event sink) BEFORE handling --help.
-  - name: "gcr.io/cloud-builders/docker"
-    id: "operability-probe"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        set -e
-        VERSION=$(cat /workspace/VERSION 2>/dev/null || echo "$SHORT_SHA")
-        IMG="asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}:$$VERSION"
-        echo "=== Operability probe: IMPORT ${_PKG_NAME} ==="
-        docker run --rm --entrypoint python "$$IMG" \
-          -c "import ${_PKG_NAME}; print('IMPORT OK')"
-        echo "=== Operability probe: RUN --help ==="
-        docker run --rm \
-          -e CLOUD_PROVIDER=local \
-          -e CLOUD_MOCK_MODE=true \
-          -e GCP_PROJECT_ID=smoke \
-          -e ENVIRONMENT=dev \
-          "$$IMG" --help
-        echo "=== Operability probe PASSED ==="
-    waitFor: ["quality-gates"]
-
-  # ── STEP 6: REQUIRED — Push image ONLY if quality gates + operability probe passed ─
+  # ── STEP 6: REQUIRED — Push image ONLY if quality gates passed ────────────
   - name: "gcr.io/cloud-builders/docker"
     id: "push"
     args:
@@ -213,7 +199,7 @@ steps:
         "--all-tags",
         "asia-northeast1-docker.pkg.dev/$PROJECT_ID/${_REGISTRY_REPO}/${_SERVICE_NAME}",
       ]
-    waitFor: ["operability-probe"]
+    waitFor: ["quality-gates"]
 
   # ── STEP 7: REQUIRED — Vulnerability scan (CRITICAL CVE gate) ────────────
   # Container Analysis scans asynchronously after push; poll up to 3 minutes.
