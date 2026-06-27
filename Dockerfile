@@ -19,6 +19,8 @@ COPY cloudbuild.yaml ./
 
 # --no-deps: UTL base image pre-installs unified-trading-library and
 # unified-api-contracts; avoids needing local path deps in build context.
+ARG SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BATCH_LIVE_RECONCILIATION_SERVICE
+ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BATCH_LIVE_RECONCILIATION_SERVICE=${SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BATCH_LIVE_RECONCILIATION_SERVICE:-}
 RUN uv pip install --system -e . --no-deps
 
 ENTRYPOINT ["python", "-m", "batch_live_reconciliation_service"]
