@@ -72,7 +72,17 @@ steps:
     args:
       - "-c"
       - |
-        VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "//;s/"//')
+        git fetch --tags --force --quiet 2>/dev/null || true
+        VERSION=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')
+        if [ -z "$$VERSION" ]; then
+          VERSION=$(git tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | head -1 | sed 's/^v//')
+        fi
+        if [ -z "$$VERSION" ]; then
+          VERSION=$(grep '^version' pyproject.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//')
+        fi
+        if [ -z "$$VERSION" ]; then
+          VERSION="$SHORT_SHA"
+        fi
         echo "$$VERSION" > /workspace/VERSION
         echo "Building version $$VERSION"
     waitFor: ["-"]
