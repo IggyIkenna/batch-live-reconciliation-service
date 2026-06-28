@@ -2,7 +2,7 @@ ARG PROJECT_ID
 # Digest-pinned UTL base image (QG STEP 5.79 -- reproducible builds + UTL/UAC provenance).
 # Refreshed by the dependency-update fan-out (update-dependency-version.yml) on base-image
 # republish; cloudbuild may override at build time: --build-arg BASE_IMAGE_DIGEST=sha256:...
-ARG BASE_IMAGE_DIGEST=sha256:75926d35b5960cfc88eb3dd95e9498461857a5d6b0e8070880a35c951bafd4a8
+ARG BASE_IMAGE_DIGEST=sha256:84a1baaa01ef17c62d7cd976b713f0679a48054d2d32c85b18627cc6914d9423
 FROM --platform=linux/amd64 asia-northeast1-docker.pkg.dev/${PROJECT_ID}/unified-trading-library/unified-trading-library@${BASE_IMAGE_DIGEST}
 
 WORKDIR /app/batch-live-reconciliation-service
@@ -19,6 +19,9 @@ COPY cloudbuild.yaml ./
 
 # --no-deps: UTL base image pre-installs unified-trading-library and
 # unified-api-contracts; avoids needing local path deps in build context.
+# scm-version-fix: pretend version for editable install (D13 git-tag versioning)
+ARG SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}
 RUN uv pip install --system -e . --no-deps
 
 ENTRYPOINT ["python", "-m", "batch_live_reconciliation_service"]
