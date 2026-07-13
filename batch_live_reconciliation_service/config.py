@@ -71,19 +71,44 @@ class ReconConfig(UnifiedCloudConfig):
     # recon-drift events.
     soak_mode: bool = False
 
+    def _derive_cross_cutting_buckets(self, cloud: CloudProvider) -> None:
+        """Derive recon/events/execution-store buckets (kept out of model_post_init for size).
+
+        recon: env-tiered kind added 2026-07-13 per
+        plans/active/issues/recon_bucket_missing_nightly_recon_failing_2026_07_13.md — the
+        prior hand-rolled f"recon-{project_id}" bucket never existed (nightly Cloud Run job
+        failed 55/56 runs). Resolves to recon-{env}-{pid} (e.g. recon-prd-...).
+        events / execution-store: same resulting names as the prior f-strings, now
+        SSOT-resolved via resolve_bucket_name (no inline gs://).
+        Local/CI mode keeps the plain f-string fallback so local unit tests
+        (test_config.py) stay deterministic without depending on cloud-providers.yaml.
+        """
+        project_id = self.gcp_project_id or ""
+        if cloud == CloudProvider.LOCAL:
+            if not self.recon_bucket:
+                self.recon_bucket = f"recon-{project_id}"
+            if not self.events_bucket:
+                self.events_bucket = f"{project_id}-events"
+            if not self.execution_store_bucket:
+                self.execution_store_bucket = f"execution-store-cefi-{project_id}"
+            return
+        cloud_name = cast(Literal["gcp", "aws"], cloud)
+        if not self.recon_bucket:
+            self.recon_bucket = resolve_bucket_name(cloud=cloud_name, kind="recon")
+        if not self.events_bucket:
+            self.events_bucket = resolve_bucket_name(cloud=cloud_name, kind="events")
+        if not self.execution_store_bucket:
+            self.execution_store_bucket = resolve_bucket_name(
+                cloud=cloud_name, kind="execution-store", asset_group="cefi"
+            )
+
     @override
     def model_post_init(self, __context: object) -> None:
         """Derive bucket names from project_id if not set."""
-        project_id = self.gcp_project_id or ""
-        if not self.recon_bucket:
-            self.recon_bucket = f"recon-{project_id}"
-        if not self.events_bucket:
-            self.events_bucket = f"{project_id}-events"
-        if not self.execution_store_bucket:
-            self.execution_store_bucket = f"execution-store-cefi-{project_id}"
+        cloud = get_cloud_provider()
+        self._derive_cross_cutting_buckets(cloud)
         # Data pipeline buckets — resolve via resolve_bucket_name (bucket-name SSOT).
         # Skip in local mode: resolve_bucket_name only accepts "gcp" / "aws".
-        cloud = get_cloud_provider()
         if cloud != CloudProvider.LOCAL:
             cloud_name = cast(Literal["gcp", "aws"], cloud)
             if not self.instruments_bucket_cefi:
