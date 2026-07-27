@@ -36,4 +36,4 @@ gs://<recon-bucket>/
 
 ## References
 
-- `unified-trading-codex/08-workflows/t1-batch-dag.md` — full pipeline DAG, schedules, deviation thresholds
+- `unified-trading-pm/codex/08-workflows/t1-batch-dag.md` — full pipeline DAG, schedules, deviation thresholds
