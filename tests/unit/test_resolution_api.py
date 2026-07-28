@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import json
+from unittest.mock import MagicMock, patch
+
 import pytest
 from unified_api_contracts.internal import ReconciliationAction, ReconciliationResolution
 
 from batch_live_reconciliation_service.api.resolution_api import (
     _MOCK_BREAKS,
     BookCorrectionResponse,
+    _breaks_from_summary,
+    _current_breaks,
 )
+
+_MODULE = "batch_live_reconciliation_service.api.resolution_api"
 
 
 class TestListBreaks:
@@ -64,6 +71,137 @@ class TestReconciliationResolution:
                 note="short",
                 resolved_by="user@example.com",
             )
+
+
+class TestBreaksFromSummary:
+    def test_flattens_deviations_across_stages(self) -> None:
+        summary = {
+            "date": "2026-07-27",
+            "stages": [
+                {
+                    "stage": "execution_recon",
+                    "deviations": [
+                        {
+                            "metric_name": "alpha_pnl_gap",
+                            "actual_value": 3.2,
+                            "threshold": 2.0,
+                            "instrument_id": "BTC-USDT",
+                            "first_seen_at": "2026-07-27T06:00:00+00:00",
+                        }
+                    ],
+                },
+                {
+                    "stage": "ml_recon",
+                    "deviations": [
+                        {
+                            "metric_name": "signal_direction_match",
+                            "actual_value": 0.80,
+                            "threshold": 0.95,
+                            "instrument_id": None,
+                            "first_seen_at": "2026-07-27T06:00:01+00:00",
+                        }
+                    ],
+                },
+            ],
+        }
+
+        breaks = _breaks_from_summary(summary)
+
+        assert len(breaks) == 2
+        first = breaks[0]
+        assert first.break_id == "2026-07-27:execution_recon:alpha_pnl_gap:BTC-USDT"
+        assert first.venue == "ALL"
+        assert first.instrument_id == "BTC-USDT"
+        assert first.live_value == 3.2
+        assert first.batch_value == 2.0
+        assert first.delta == pytest.approx(1.2)
+        assert first.status == "pending"
+
+        second = breaks[1]
+        # No instrument_id on the deviation → falls back to AGGREGATE.
+        assert second.break_id == "2026-07-27:ml_recon:signal_direction_match:AGGREGATE"
+        assert second.instrument_id == "AGGREGATE"
+
+    def test_no_deviations_returns_empty_list(self) -> None:
+        summary = {"date": "2026-07-27", "stages": [{"stage": "execution_recon", "deviations": []}]}
+        assert _breaks_from_summary(summary) == []
+
+
+class TestCurrentBreaks:
+    def test_falls_back_to_mock_when_index_empty(self) -> None:
+        mock_client = MagicMock()
+        mock_client.download_bytes.side_effect = OSError("not found")
+        mock_config = MagicMock(recon_bucket="recon-test")
+
+        with (
+            patch(f"{_MODULE}.get_storage_client", return_value=mock_client),
+            patch(f"{_MODULE}.get_recon_config", return_value=mock_config),
+        ):
+            result = _current_breaks()
+
+        assert result == _MOCK_BREAKS
+
+    def test_falls_back_to_mock_when_summary_missing(self) -> None:
+        index_bytes = json.dumps([{"date": "2026-07-27"}]).encode("utf-8")
+        mock_client = MagicMock()
+
+        def download_bytes(bucket: str, blob_path: str) -> bytes:
+            if blob_path.endswith("index.json"):
+                return index_bytes
+            raise OSError("summary not found")
+
+        mock_client.download_bytes.side_effect = download_bytes
+        mock_config = MagicMock(recon_bucket="recon-test")
+
+        with (
+            patch(f"{_MODULE}.get_storage_client", return_value=mock_client),
+            patch(f"{_MODULE}.get_recon_config", return_value=mock_config),
+        ):
+            result = _current_breaks()
+
+        assert result == _MOCK_BREAKS
+
+    def test_reads_real_breaks_from_latest_summary(self) -> None:
+        index_bytes = json.dumps([{"date": "2026-07-27"}, {"date": "2026-07-26"}]).encode("utf-8")
+        summary_bytes = json.dumps(
+            {
+                "date": "2026-07-27",
+                "stages": [
+                    {
+                        "stage": "execution_recon",
+                        "deviations": [
+                            {
+                                "metric_name": "fill_rate_delta",
+                                "actual_value": 0.10,
+                                "threshold": 0.05,
+                                "instrument_id": "ETH-USD-PERP",
+                                "first_seen_at": "2026-07-27T06:00:00+00:00",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ).encode("utf-8")
+        mock_client = MagicMock()
+
+        def download_bytes(bucket: str, blob_path: str) -> bytes:
+            if blob_path.endswith("index.json"):
+                return index_bytes
+            assert blob_path.endswith("summary_2026-07-27.json")
+            return summary_bytes
+
+        mock_client.download_bytes.side_effect = download_bytes
+        mock_config = MagicMock(recon_bucket="recon-test")
+
+        with (
+            patch(f"{_MODULE}.get_storage_client", return_value=mock_client),
+            patch(f"{_MODULE}.get_recon_config", return_value=mock_config),
+        ):
+            result = _current_breaks()
+
+        assert len(result) == 1
+        assert result[0].break_id == "2026-07-27:execution_recon:fill_rate_delta:ETH-USD-PERP"
+        assert result[0].delta == pytest.approx(0.05)
 
 
 class TestBookCorrectionResponse:

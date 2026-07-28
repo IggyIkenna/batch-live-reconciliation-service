@@ -12,7 +12,9 @@ Provides endpoints for the UI to:
 
 from __future__ import annotations
 
+import json
 import logging
+from typing import cast
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -20,7 +22,9 @@ from unified_api_contracts.internal import (  # noqa: qg-deep-import
     ReconciliationAction,
     ReconciliationResolution,
 )
-from unified_trading_library import log_event
+from unified_trading_library import get_storage_client, log_event
+
+from batch_live_reconciliation_service.config import get_recon_config
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +80,95 @@ class BookCorrectionRequest(BaseModel):  # CORRECT-LOCAL
 
 
 # ---------------------------------------------------------------------------
-# Mock break data (replaced by GCS reads when stage5 results are available)
+# Stage-5 GCS reads (G1 — wire the resolution surface to real recon output)
+# ---------------------------------------------------------------------------
+#
+# BLRS deviations are stage/metric-level aggregate threshold breaches (e.g.
+# "alpha_pnl_gap 3.2% > 2% of notional"), not per-venue/per-position breaks —
+# there is no raw live-vs-batch value pair per deviation, only the observed
+# metric (``actual_value``) vs its tolerance (``threshold``). We map those
+# onto the UI-facing ``live_value``/``batch_value``/``delta`` fields as the
+# closest honest fit; ``venue`` is not populated by any stage today (a T+1
+# pipeline/strategy/execution audit is cross-venue), so it reads "ALL".
+
+
+def _load_index(bucket: str) -> list[dict[str, object]]:
+    """Load the recon run index (most-recent-first) from GCS, or [] if absent."""
+    client = get_storage_client()
+    try:
+        raw = client.download_bytes(bucket=bucket, blob_path="t1-recon/recon/index.json")
+        return cast(list[dict[str, object]], json.loads(raw.decode("utf-8")))
+    except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, OSError):
+        return []
+
+
+def _load_summary(bucket: str, date: str) -> dict[str, object] | None:
+    """Load one date's consolidated Stage-5 summary from GCS, or None if absent."""
+    client = get_storage_client()
+    try:
+        raw = client.download_bytes(bucket=bucket, blob_path=f"t1-recon/recon/summary_{date}.json")
+        return cast(dict[str, object], json.loads(raw.decode("utf-8")))
+    except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, OSError):
+        return None
+
+
+def _break_id(date: str, stage: str, metric_name: str, instrument_id: str | None) -> str:
+    return f"{date}:{stage}:{metric_name}:{instrument_id or 'AGGREGATE'}"
+
+
+def _breaks_from_summary(summary: dict[str, object]) -> list[ReconciliationBreakResponse]:
+    """Flatten every stage's deviations in a Stage-5 summary into UI-facing breaks."""
+    date = str(summary.get("date", ""))  # noqa: qg-empty-fallback  # writer-populated; empty reads as unknown-date
+    raw_stages = summary.get("stages", [])  # noqa: qg-empty-fallback  # a stage-less summary has zero breaks to surface
+    stages = cast(list[dict[str, object]], raw_stages)
+    breaks: list[ReconciliationBreakResponse] = []
+    for stage_entry in stages:
+        stage_name = str(stage_entry.get("stage", ""))  # noqa: qg-empty-fallback  # writer-populated; never absent
+        raw_deviations = stage_entry.get("deviations", [])  # noqa: qg-empty-fallback  # a PASSED stage has zero
+        deviations = cast(list[dict[str, object]], raw_deviations)
+        for dev in deviations:
+            metric_name = str(dev.get("metric_name", ""))  # noqa: qg-empty-fallback  # writer-populated; never absent
+            instrument_id = cast("str | None", dev.get("instrument_id"))
+            actual_value = float(cast(float, dev.get("actual_value", 0.0)))
+            threshold = float(cast(float, dev.get("threshold", 0.0)))
+            breaks.append(
+                ReconciliationBreakResponse(
+                    break_id=_break_id(date, stage_name, metric_name, instrument_id),
+                    date=date,
+                    venue="ALL",
+                    break_type=metric_name,
+                    instrument_id=instrument_id or "AGGREGATE",
+                    live_value=actual_value,
+                    batch_value=threshold,
+                    delta=actual_value - threshold,
+                    status="pending",
+                    detected_at=str(dev.get("first_seen_at", "")),  # noqa: qg-empty-fallback  # writer-populated
+                )
+            )
+    return breaks
+
+
+def _current_breaks() -> list[ReconciliationBreakResponse]:
+    """The breaks the resolution surface currently offers.
+
+    Reads the latest Stage-5 GCS summary (real recon output) when one
+    exists. Falls back to the illustrative mock set only when NO run has
+    ever produced a summary — a genuine "recon ran, zero deviations today"
+    result stays a real (possibly empty) list, it never masks into the mock.
+    """
+    config = get_recon_config()
+    index = _load_index(config.recon_bucket)
+    if not index:
+        return list(_MOCK_BREAKS)
+    latest_date = str(index[0].get("date", ""))  # noqa: qg-empty-fallback  # empty → treated as no-summary below
+    summary = _load_summary(config.recon_bucket, latest_date) if latest_date else None
+    if summary is None:
+        return list(_MOCK_BREAKS)
+    return _breaks_from_summary(summary)
+
+
+# ---------------------------------------------------------------------------
+# Mock break data — pre-activation fallback (see _current_breaks above)
 # ---------------------------------------------------------------------------
 
 _MOCK_BREAKS: list[ReconciliationBreakResponse] = [
@@ -134,7 +226,7 @@ async def list_breaks(
     status: str | None = None,
 ) -> list[ReconciliationBreakResponse]:
     """List reconciliation breaks with optional filters."""
-    result = list(_MOCK_BREAKS)
+    result = _current_breaks()
 
     if venue:
         result = [b for b in result if b.venue.lower() == venue.lower()]
@@ -158,7 +250,7 @@ async def resolve_break(resolution: ReconciliationResolution) -> ResolveResponse
     Persists resolution to audit log for FCA compliance.
     """
     # Validate break exists
-    brk = next((b for b in _MOCK_BREAKS if b.break_id == resolution.break_id), None)
+    brk = next((b for b in _current_breaks() if b.break_id == resolution.break_id), None)
     if brk is None:
         raise HTTPException(status_code=404, detail=f"Break {resolution.break_id} not found")
 
@@ -203,7 +295,7 @@ async def book_correction(request: BookCorrectionRequest) -> BookCorrectionRespo
     Returns the parameters needed to navigate to the back-office booking page
     with the form pre-filled for the correction.
     """
-    brk = next((b for b in _MOCK_BREAKS if b.break_id == request.break_id), None)
+    brk = next((b for b in _current_breaks() if b.break_id == request.break_id), None)
     if brk is None:
         raise HTTPException(status_code=404, detail=f"Break {request.break_id} not found")
 

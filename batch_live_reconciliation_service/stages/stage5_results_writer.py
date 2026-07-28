@@ -19,6 +19,7 @@ from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.config import ReconConfig
 from batch_live_reconciliation_service.models.recon_report import (
+    DeviationRecord,
     ReconReport,
     ReconStage,
     ReconStatus,
@@ -26,6 +27,25 @@ from batch_live_reconciliation_service.models.recon_report import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_deviation(d: DeviationRecord) -> dict[str, object]:
+    """Serialize a single deviation for the Stage-5 summary JSON.
+
+    Carries the per-deviation detail (not just the stage's aggregate metrics)
+    so downstream consumers — the resolution API's break listing — can
+    reconstruct individual breaks from GCS instead of a hardcoded mock.
+    """
+    return {
+        "metric_name": d.metric_name,
+        "actual_value": d.actual_value,
+        "threshold": d.threshold,
+        "direction": d.direction,
+        "description": d.description,
+        "instrument_id": d.instrument_id,
+        "dimension": d.dimension.value,
+        "first_seen_at": d.first_seen_at.isoformat(),
+    }
 
 
 def _load_index(bucket: str) -> list[dict[str, object]]:
@@ -75,6 +95,7 @@ def run_stage5(
                     "metrics": s.metrics,
                     "output_gcs_path": s.output_gcs_path,
                     "error_message": s.error_message,
+                    "deviations": [_serialize_deviation(d) for d in s.deviations],
                 }
                 for s in report.stages
             ],
