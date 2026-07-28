@@ -60,11 +60,19 @@ jobs:
     uses: IggyIkenna/unified-trading-pm/.github/workflows/python-quality-gates-v2.yml@live-defi-rollout
     with:
       dep_repos: "unified-trading-library unified-api-contracts"
-      # Empty (the vast majority of repos) -> the reusable workflow's own default -> ubuntu-latest.
-      # Non-empty only for repos in scripts/workflow-templates/self-hosted-qg-repos.txt — see
-      # unified-trading-pm/.github/workflows/python-quality-gates-v2.yml's own input doc for why this
-      # can't be a blanket default (github_actions_operator_gated_followups_2026_07_17.md).
-      self_hosted_runner_labels: '["self-hosted","glue"]'
+      # Empty -> the reusable workflow's own default -> ubuntu-latest. Reverted 2026-07-28
+      # (ldr_qg_failure escalation agt-70dbed): this repo's self-hosted flip (1c2b5ba) landed
+      # on the shared `i-0c9b283b31d6b5ca7` glue pool ahead of the 23-repo fanout's own
+      # operator-paced capacity plan (github_actions_operator_gated_followups_2026_07_17.md P1
+      # INFRA todo, still NOT started at the time of this revert — see
+      # plans/active/issues/fleet_wide_qg_self_hosted_runner_capacity_crisis_2026_07_27.md,
+      # which already identifies this repo as one of the 19 prematurely flipped). Promotion PR
+      # #255's quality-gates-v2 run (30305786014) ran 51m18s — vs a normal 8-15min — with the
+      # tests slice queued 6+min on "[qg-governor] all 4 tokens busy" and never starting, and the
+      # typecheck slice hitting a hard `timeout` (exit=124) mid-run: consistent with severe
+      # CPU/disk contention on the oversubscribed shared pool, not a code regression. Confirmed:
+      # a clean local `quality-gates.sh` run at the same HEAD (806fba72) passed in 58s. Re-add
+      # only once the fanout's capacity plan actually covers this repo.
     secrets: inherit
     # Note: reusable workflow inputs are intentionally minimal — service_name + source_dir
     # are derived inside the reusable workflow from github.repository (caller's repo name)
