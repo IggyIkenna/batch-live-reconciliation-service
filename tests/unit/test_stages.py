@@ -747,6 +747,58 @@ class TestStage5ResultsWriter:
 
         assert result.status == ReconStatus.FAILED
 
+    def test_summary_upload_includes_serialized_deviations(self, mock_config: MagicMock) -> None:
+        """G1: Stage-5's summary JSON carries per-deviation detail (metric/actual/threshold/
+        instrument_id/...), not just aggregate stage metrics — this is what the resolution API's
+        _breaks_from_summary() reconstructs real breaks from."""
+        import json
+
+        from unified_api_contracts.internal.reconciliation import ReconciliationDimension
+
+        from batch_live_reconciliation_service.models.recon_report import DeviationRecord
+        from batch_live_reconciliation_service.stages.stage5_results_writer import run_stage5
+
+        deviation = DeviationRecord.new(
+            metric_name="alpha_pnl_gap",
+            stage=ReconStage.EXECUTION_RECON,
+            actual_value=3.2,
+            threshold=2.0,
+            direction="above",
+            description="alpha_pnl_gap 3.2% > 2% of notional",
+            dimension=ReconciliationDimension.POSITIONS,
+            instrument_id="BTC-USDT",
+        )
+        stage_report = StageReport(
+            stage=ReconStage.EXECUTION_RECON,
+            status=ReconStatus.FAILED,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            deviations=[deviation],
+        )
+        report = ReconReport(
+            date="2026-07-27",
+            run_id="test-run-002",
+            started_at=datetime.now(UTC),
+            status=ReconStatus.FAILED,
+            stages=[stage_report],
+        )
+
+        mock_client = MagicMock()
+        with patch(
+            "batch_live_reconciliation_service.stages.stage5_results_writer.get_storage_client",
+            return_value=mock_client,
+        ):
+            result = run_stage5(mock_config, report, dry_run=False)
+
+        assert result.status == ReconStatus.PASSED
+        summary_call = next(c for c in mock_client.upload_bytes.call_args_list if "summary_" in c.kwargs["blob_path"])
+        payload = json.loads(summary_call.kwargs["data"].decode("utf-8"))
+        serialized = payload["stages"][0]["deviations"][0]
+        assert serialized["metric_name"] == "alpha_pnl_gap"
+        assert serialized["actual_value"] == 3.2
+        assert serialized["threshold"] == 2.0
+        assert serialized["instrument_id"] == "BTC-USDT"
+
     def test_load_index_returns_empty_on_error(self, mock_config: MagicMock) -> None:
         from batch_live_reconciliation_service.stages.stage5_results_writer import _load_index
 

@@ -99,12 +99,17 @@ def test_service_specific_events_exist(all_event_markers: set[str]) -> None:
 def test_event_helper_imported(all_event_markers: set[str]) -> None:
     """log_event must be imported directly from unified_trading_library.events.
 
-    No try/except ImportError fallbacks are permitted (see no-empty-fallbacks rule).
+    No try/except ImportError fallbacks are permitted (see no-empty-fallbacks rule). Matches both a
+    solo import and one combined with other names on the same line (e.g.
+    ``from unified_trading_library import get_storage_client, log_event``) — ruff's import-merge
+    rule (I001) collapses same-module imports onto one line, so a literal solo-import match is too
+    brittle: it broke the moment the only bare ``import log_event`` line picked up a sibling name.
     """
     if not all_event_markers:
         pytest.skip("No event markers found in source — check service directory")
+    import_pattern = re.compile(r"from unified_trading_library import\s+[\w,\s]*\blog_event\b")
     for py in _find_python_files(Path.cwd()):
-        if "from unified_trading_library import log_event" in py.read_text():
+        if import_pattern.search(py.read_text()):
             return
     pytest.fail(
         "log_event not imported from unified_trading_library.events.\n"
