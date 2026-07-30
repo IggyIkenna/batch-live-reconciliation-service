@@ -213,6 +213,25 @@ def test_deviation_record_has_correct_stage() -> None:
     assert deviations[0].metric_name == "manifest_reason_disagreement"
 
 
+def test_read_availability_index_is_column_projected() -> None:
+    """Pins the exact columns= projection so a future edit can't silently drop back to a bare call.
+
+    The 1.58 GB defi prod availability index is one cache-miss from an OOM if read
+    unprojected (read_availability_index_bare_defi_callers_2026_07_27.md). Only
+    date/pipeline_mode/capture_status/error_reason are touched by this module.
+    """
+    manifest = _make_manifest([_row(_BATCH, "captured")])
+    with patch(
+        "batch_live_reconciliation_service.stages.stage0_manifest_reason_check.read_availability_index",
+        return_value=manifest,
+    ) as mock_read:
+        check_manifest_reason_agreement(bucket=_BUCKET, dates=[_DATE], asset_group=_AG)
+    mock_read.assert_called_once_with(
+        _BUCKET,
+        columns=["date", "pipeline_mode", "capture_status", "error_reason"],
+    )
+
+
 def test_legacy_transitional_alias_still_resolves_to_live_side() -> None:
     """Old parquets carry the transitional alias (live_ + websocket as one token).
 

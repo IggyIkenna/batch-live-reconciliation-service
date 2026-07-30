@@ -174,7 +174,10 @@ def check_manifest_reason_agreement(
         Returns empty list on manifest read errors (fail-open).
     """
     try:
-        manifest = read_availability_index(bucket)
+        manifest = read_availability_index(
+            bucket,
+            columns=["date", "pipeline_mode", "capture_status", "error_reason"],
+        )
     except (OSError, ValueError) as exc:
         logger.warning(
             "manifest_reason_check: could not read %s — failing open: %s",
