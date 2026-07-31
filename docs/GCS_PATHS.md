@@ -36,4 +36,6 @@ gs://<recon-bucket>/
 
 ## References
 
+- `unified-trading-pm/codex/09-strategy/operational/paper-batch-live-reconciliation.md` — canonical SSOT for the
+  paper(W)==batch-rerun(W) determinism spine this service reconciles (the four ledgers + ε=0 proof)
 - `unified-trading-pm/codex/08-workflows/t1-batch-dag.md` — full pipeline DAG, schedules, deviation thresholds
