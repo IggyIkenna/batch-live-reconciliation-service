@@ -90,13 +90,7 @@ reportAttributeAccessIssue = "error"
 root = "."
 pythonVersion = "3.13"
 pythonPlatform = "All"
-extraPaths = [
-    "../unified-config-interface",
-    "../unified-internal-contracts",
-    "../unified-trading-library",
-    "../unified-cloud-interface",
-    "../unified-api-contracts",
-]
+extraPaths = ["../unified-trading-library", "../unified-api-contracts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
