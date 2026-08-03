@@ -9,7 +9,7 @@ description = "T+1 nightly batch-live reconciliation orchestrator"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "pydantic<3.0.0,>=2.12.5",
-    "unified-trading-library>=0.66.0,<1.0.0",
+    "unified-trading-library>=0.72.0,<1.0.0",
     "unified-api-contracts>=0.81.0,<1.0.0",
     # Pinned to safe versions (CVE-2026-{34073,39892,44431,44432,28684})
     "cryptography>=47.0.0,<50.0.0",
