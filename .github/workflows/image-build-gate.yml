@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   validate:
-    uses: IggyIkenna/unified-trading-pm/.github/workflows/image-build-validate.yml@live-defi-rollout
+    uses: IggyIkenna/unified-trading-ci/.github/workflows/image-build-validate.yml@main
     with:
       repo: ${{ github.event.repository.name }}
       commit_sha: ${{ github.event.pull_request.head.sha }}
