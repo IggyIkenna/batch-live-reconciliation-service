@@ -10,7 +10,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "pydantic<3.0.0,>=2.12.5",
     "unified-trading-library>=0.72.0,<1.0.0",
-    "unified-api-contracts>=0.95.0,<1.0.0",
+    "unified-api-contracts>=0.97.0,<1.0.0",
     # Pinned to safe versions (CVE-2026-{34073,39892,44431,44432,28684}, CVE-2026-69247)
     "cryptography>=50.0.0,<51.0.0",
     "urllib3>=2.7.0,<3.0.0",
