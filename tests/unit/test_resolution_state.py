@@ -21,6 +21,7 @@ import pytest
 from batch_live_reconciliation_service.api.resolution_state import (
     PERSISTENT_EXCLUSIONS_BLOB,
     DeltaExclusion,
+    ExclusionPersistenceError,
     ExclusionScope,
     PauseRequiredError,
     ResolutionStateStore,
@@ -233,6 +234,31 @@ class TestPersistence:
         ):
             fresh = ResolutionStateStore()
             assert fresh.excluded_break_ids(run_date="2026-03-22", bucket=_BUCKET) == frozenset()
+
+    def test_a_failed_persistent_write_raises_and_does_not_pretend_to_suppress(self) -> None:
+        """The recon bucket has a real history of not existing (the nightly job
+        failed 55/56 runs against one). Accepting an exclusion that was never
+        stored is the worst outcome: the operator believes a break is suppressed
+        forever and it is not."""
+        unwritable = MagicMock()
+        unwritable.download_bytes.side_effect = OSError("no such bucket")
+        unwritable.upload_bytes.side_effect = OSError("no such bucket")
+        with patch(
+            "batch_live_reconciliation_service.api.resolution_state.get_storage_client",
+            return_value=unwritable,
+        ):
+            store = ResolutionStateStore()
+            with pytest.raises(ExclusionPersistenceError, match="NOT saved"):
+                store.exclude(
+                    break_id="BRK-002",
+                    scope=ExclusionScope.PERSISTENT,
+                    reason="structural divergence accepted by risk",
+                    excluded_by="ops@example.com",
+                    run_date=None,
+                    bucket=_BUCKET,
+                )
+            # and the break must still be raised, not silently suppressed
+            assert store.excluded_break_ids(run_date="2026-03-22", bucket=_BUCKET) == frozenset()
 
     def test_corrupt_exclusions_object_re_raises_breaks_rather_than_suppressing(self) -> None:
         """Half-parsed suppression state must never hide a break — failing open

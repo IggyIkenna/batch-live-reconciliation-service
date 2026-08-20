@@ -150,6 +150,27 @@ class DeltaExclusion:
         )
 
 
+class ExclusionPersistenceError(RuntimeError):
+    """A PERSISTENT exclusion could not be written to GCS.
+
+    Raised rather than swallowed on purpose. A persistent exclusion accepted but
+    not stored is the worst outcome available: the operator believes a break is
+    suppressed for every future run, and it is not. The recon bucket has a real
+    history of not existing
+    (`/plans/active/issues/recon_bucket_missing_nightly_recon_failing_2026_07_13.md`
+    — the nightly job failed 55/56 runs against a bucket that never existed), so
+    this is a reachable condition, not a defensive hypothetical.
+    """
+
+    def __init__(self, bucket: str, cause: Exception) -> None:
+        super().__init__(
+            f"Persistent exclusion NOT saved: writing {PERSISTENT_EXCLUSIONS_BLOB!r} to bucket {bucket!r} "
+            f"failed ({type(cause).__name__}: {cause}). The exclusion is NOT in effect — the break will keep "
+            "being raised. Retry once the bucket is reachable, or use a virtual exclusion for this run."
+        )
+        self.bucket = bucket
+
+
 class PauseRequiredError(RuntimeError):
     """Raised when a manual correction is requested without an active pause.
 
@@ -364,10 +385,18 @@ class ResolutionStateStore:  # CORRECT-LOCAL: service-internal operator state, n
         return self._persistent_cache
 
     def _write_persistent(self, bucket: str, records: list[DeltaExclusion]) -> None:
-        """Rewrite the whole persistent-exclusion object, revoked records included."""
+        """Rewrite the whole persistent-exclusion object, revoked records included.
+
+        The cache is updated only AFTER a successful write, so a failed write
+        cannot leave this process believing an exclusion is in effect.
+        """
         client = get_storage_client()
         payload = json.dumps([r.to_json() for r in records], indent=2).encode("utf-8")
-        _ = client.upload_bytes(bucket=bucket, blob_path=PERSISTENT_EXCLUSIONS_BLOB, data=payload)
+        try:
+            _ = client.upload_bytes(bucket=bucket, blob_path=PERSISTENT_EXCLUSIONS_BLOB, data=payload)
+        except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, OSError) as exc:
+            logger.error("Persistent exclusion write to %s failed: %s", bucket, exc)
+            raise ExclusionPersistenceError(bucket, exc) from exc
         self._persistent_cache = records
 
     def invalidate_cache(self) -> None:
@@ -378,6 +407,7 @@ class ResolutionStateStore:  # CORRECT-LOCAL: service-internal operator state, n
 __all__ = [
     "PERSISTENT_EXCLUSIONS_BLOB",
     "DeltaExclusion",
+    "ExclusionPersistenceError",
     "ExclusionScope",
     "PauseRequiredError",
     "ResolutionStateStore",
