@@ -771,8 +771,20 @@ class TestResolutionAPI:
     def test_book_correction_positive_delta_is_buy(self) -> None:
         import asyncio
 
+        import batch_live_reconciliation_service.api.resolution_api as ra
         from batch_live_reconciliation_service.api.resolution_api import BookCorrectionRequest, book_correction
 
+        # W12 pause-before-manual-entry (2026-08-20): book_correction now refuses
+        # with 409 unless the break's instrument is paused. Pausing first is the
+        # intended flow, not test scaffolding — the interlock's own coverage
+        # (including the refusal) lives in tests/unit/test_resolution_state.py.
+        ra._state.pause(
+            venue="Binance",
+            instrument_id="BTC-USDT",
+            break_id="BRK-001",
+            reason="booking a manual correction",
+            paused_by="ops-user",
+        )
         request = BookCorrectionRequest(break_id="BRK-001")
         result = asyncio.run(book_correction(request))
         assert result.side == "BUY"
@@ -805,6 +817,14 @@ class TestResolutionAPI:
         )
         original_breaks = ra._MOCK_BREAKS[:]
         ra._MOCK_BREAKS.append(neg_break)
+        # See the pause note in test_book_correction_positive_delta_is_buy.
+        ra._state.pause(
+            venue="OKX",
+            instrument_id="SOL-USD",
+            break_id="BRK-NEG",
+            reason="booking a manual correction",
+            paused_by="ops-user",
+        )
         try:
             request = BookCorrectionRequest(break_id="BRK-NEG")
             result = asyncio.run(book_correction(request))
