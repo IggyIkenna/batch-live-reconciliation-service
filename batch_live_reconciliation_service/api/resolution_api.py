@@ -26,6 +26,7 @@ from unified_trading_library import get_storage_client, log_event
 
 from batch_live_reconciliation_service.api.resolution_state import (
     DeltaExclusion,
+    ExclusionPersistenceError,
     ExclusionScope,
     PauseRequiredError,
     ResolutionStateStore,
@@ -515,6 +516,10 @@ async def exclude_delta(request: ExcludeRequest) -> ExclusionView:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ExclusionPersistenceError as exc:
+        # 503, not 500: the request was well-formed and the exclusion is simply
+        # not stored. The message says so explicitly rather than implying success.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return _exclusion_view(entry)
 
 
@@ -522,12 +527,15 @@ async def exclude_delta(request: ExcludeRequest) -> ExclusionView:
 async def revoke_exclusion(request: RevokeRequest) -> ExclusionView:
     """Revoke an exclusion so the break is raised again. Soft-delete."""
     config = get_recon_config()
-    revoked = _state.revoke_exclusion(
-        break_id=request.break_id,
-        revoked_by=request.actor,
-        reason=request.reason,
-        bucket=config.recon_bucket,
-    )
+    try:
+        revoked = _state.revoke_exclusion(
+            break_id=request.break_id,
+            revoked_by=request.actor,
+            reason=request.reason,
+            bucket=config.recon_bucket,
+        )
+    except ExclusionPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     if revoked is None:
         raise HTTPException(status_code=404, detail=f"No active exclusion for break {request.break_id}")
     return _exclusion_view(revoked)
