@@ -24,6 +24,13 @@ from unified_api_contracts.internal import (  # noqa: qg-deep-import
 )
 from unified_trading_library import get_storage_client, log_event
 
+from batch_live_reconciliation_service.api.resolution_state import (
+    DeltaExclusion,
+    ExclusionScope,
+    PauseRequiredError,
+    ResolutionStateStore,
+    TradingPause,
+)
 from batch_live_reconciliation_service.config import get_recon_config
 
 logger = logging.getLogger(__name__)
@@ -213,6 +220,108 @@ _MOCK_BREAKS: list[ReconciliationBreakResponse] = [
 # In-memory resolution store (replaced by GCS persistence in production)
 _resolutions: dict[str, ReconciliationResolution] = {}
 
+# Operator state: pauses + delta exclusions + their soft-delete audit trail (W12).
+# Pauses and VIRTUAL exclusions are process-local; PERSISTENT exclusions live in
+# GCS — see resolution_state's module docstring for why that split IS the feature.
+_state = ResolutionStateStore()
+
+
+def get_state_store() -> ResolutionStateStore:
+    """Return the module-level operator-state store."""
+    return _state
+
+
+class PauseRequest(BaseModel):  # CORRECT-LOCAL
+    """Pause automated trading on a break's instrument before booking a correction."""
+
+    break_id: str = Field(..., description="Break whose instrument should be paused")
+    reason: str = Field(..., min_length=10, description="Why trading is being paused")
+    actor: str = Field(..., description="Operator performing the pause")
+
+
+class RevokeRequest(BaseModel):  # CORRECT-LOCAL
+    """Revoke a pause or an exclusion. Soft-delete — the record is retained."""
+
+    break_id: str = Field(..., description="Break the pause/exclusion was recorded against")
+    reason: str = Field(..., min_length=10, description="Why it is being revoked")
+    actor: str = Field(..., description="Operator performing the revoke")
+
+
+class ExcludeRequest(BaseModel):  # CORRECT-LOCAL
+    """Exclude a break's delta from reconciliation."""
+
+    break_id: str = Field(..., description="Break to exclude")
+    scope: ExclusionScope = Field(..., description="virtual = this run only; persistent = until revoked")
+    reason: str = Field(..., min_length=10, description="Why the delta is excluded")
+    actor: str = Field(..., description="Operator performing the exclusion")
+
+
+class PauseView(BaseModel):  # CORRECT-LOCAL
+    """One pause record, active or revoked (audit view)."""
+
+    venue: str
+    instrument_id: str
+    break_id: str
+    reason: str
+    paused_by: str
+    paused_at: str
+    active: bool
+    revoked_at: str | None = None
+    revoked_by: str | None = None
+    revoke_reason: str | None = None
+
+
+class ExclusionView(BaseModel):  # CORRECT-LOCAL
+    """One exclusion record, active or revoked (audit view)."""
+
+    break_id: str
+    scope: str
+    reason: str
+    excluded_by: str
+    excluded_at: str
+    run_date: str | None = None
+    active: bool
+    revoked_at: str | None = None
+    revoked_by: str | None = None
+    revoke_reason: str | None = None
+
+
+def _pause_view(entry: TradingPause) -> PauseView:
+    return PauseView(
+        venue=entry.venue,
+        instrument_id=entry.instrument_id,
+        break_id=entry.break_id,
+        reason=entry.reason,
+        paused_by=entry.paused_by,
+        paused_at=entry.paused_at.isoformat(),
+        active=entry.is_active,
+        revoked_at=entry.revoked_at.isoformat() if entry.revoked_at else None,
+        revoked_by=entry.revoked_by,
+        revoke_reason=entry.revoke_reason,
+    )
+
+
+def _exclusion_view(entry: DeltaExclusion) -> ExclusionView:
+    return ExclusionView(
+        break_id=entry.break_id,
+        scope=entry.scope.value,
+        reason=entry.reason,
+        excluded_by=entry.excluded_by,
+        excluded_at=entry.excluded_at.isoformat(),
+        run_date=entry.run_date,
+        active=entry.is_active,
+        revoked_at=entry.revoked_at.isoformat() if entry.revoked_at else None,
+        revoked_by=entry.revoked_by,
+        revoke_reason=entry.revoke_reason,
+    )
+
+
+def _require_break(break_id: str) -> ReconciliationBreakResponse:
+    brk = next((b for b in _current_breaks() if b.break_id == break_id), None)
+    if brk is None:
+        raise HTTPException(status_code=404, detail=f"Break {break_id} not found")
+    return brk
+
 
 # ---------------------------------------------------------------------------
 # Endpoints
@@ -224,8 +333,15 @@ async def list_breaks(
     venue: str | None = None,
     break_type: str | None = None,
     status: str | None = None,
+    include_excluded: bool = False,
 ) -> list[ReconciliationBreakResponse]:
-    """List reconciliation breaks with optional filters."""
+    """List reconciliation breaks with optional filters.
+
+    Breaks with an active delta exclusion are hidden by default — that is what
+    excluding one is for. ``include_excluded=true`` shows them anyway (marked
+    ``status="excluded"``) so an operator can audit what is being suppressed
+    without having to read the exclusion list separately.
+    """
     result = _current_breaks()
 
     if venue:
@@ -240,7 +356,18 @@ async def list_breaks(
         if brk.break_id in _resolutions:
             brk.status = _resolutions[brk.break_id].action.value
 
-    return result
+    # W12 delta exclusion. Evaluated per break because each carries its own run
+    # date, and a VIRTUAL exclusion is scoped to exactly one of them.
+    bucket = get_recon_config().recon_bucket
+    kept: list[ReconciliationBreakResponse] = []
+    for brk in result:
+        excluded = brk.break_id in _state.excluded_break_ids(run_date=brk.date, bucket=bucket)
+        if not excluded:
+            kept.append(brk)
+        elif include_excluded:
+            brk.status = "excluded"
+            kept.append(brk)
+    return kept
 
 
 @router.post("/resolve", response_model=ResolveResponse)
@@ -249,11 +376,7 @@ async def resolve_break(resolution: ReconciliationResolution) -> ResolveResponse
 
     Persists resolution to audit log for FCA compliance.
     """
-    # Validate break exists
-    brk = next((b for b in _current_breaks() if b.break_id == resolution.break_id), None)
-    if brk is None:
-        raise HTTPException(status_code=404, detail=f"Break {resolution.break_id} not found")
-
+    _ = _require_break(resolution.break_id)
     _resolutions[resolution.break_id] = resolution
 
     log_event(
@@ -295,9 +418,15 @@ async def book_correction(request: BookCorrectionRequest) -> BookCorrectionRespo
     Returns the parameters needed to navigate to the back-office booking page
     with the form pre-filled for the correction.
     """
-    brk = next((b for b in _current_breaks() if b.break_id == request.break_id), None)
-    if brk is None:
-        raise HTTPException(status_code=404, detail=f"Break {request.break_id} not found")
+    brk = _require_break(request.break_id)
+
+    # W12 pause-before-manual-entry: refuse to hand out a booking while automation
+    # is still trading this instrument. A correction booked against a position
+    # automation also believes it owns can double-apply.
+    try:
+        _state.require_pause(brk.venue, brk.instrument_id)
+    except PauseRequiredError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     # Determine side based on delta direction
     side = "BUY" if brk.delta > 0 else "SELL"
@@ -314,3 +443,101 @@ async def book_correction(request: BookCorrectionRequest) -> BookCorrectionRespo
         ),
         source_reference=request.break_id,
     )
+
+
+# ---------------------------------------------------------------------------
+# W12 — pauses, delta exclusions, and their soft-delete audit trail
+# ---------------------------------------------------------------------------
+
+
+@router.post("/pause", response_model=PauseView)
+async def pause_trading(request: PauseRequest) -> PauseView:
+    """Pause automated trading on a break's instrument.
+
+    Required before `/book-correction` will hand out a manual booking.
+    """
+    brk = _require_break(request.break_id)
+    entry = _state.pause(
+        venue=brk.venue,
+        instrument_id=brk.instrument_id,
+        break_id=brk.break_id,
+        reason=request.reason,
+        paused_by=request.actor,
+    )
+    return _pause_view(entry)
+
+
+@router.post("/pause/revoke", response_model=PauseView)
+async def revoke_pause(request: RevokeRequest) -> PauseView:
+    """Lift a pause. Soft-delete — the record stays in the audit trail."""
+    brk = _require_break(request.break_id)
+    revoked = _state.revoke_pause(
+        venue=brk.venue,
+        instrument_id=brk.instrument_id,
+        revoked_by=request.actor,
+        reason=request.reason,
+    )
+    if revoked is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No active pause for {brk.venue}/{brk.instrument_id} to revoke",
+        )
+    return _pause_view(revoked)
+
+
+@router.get("/pauses", response_model=list[PauseView])
+async def list_pauses(active_only: bool = False) -> list[PauseView]:
+    """Every pause ever recorded. Defaults to the full audit view, revoked included."""
+    entries = _state.all_pauses()
+    if active_only:
+        entries = tuple(e for e in entries if e.is_active)
+    return [_pause_view(e) for e in entries]
+
+
+@router.post("/exclusions", response_model=ExclusionView)
+async def exclude_delta(request: ExcludeRequest) -> ExclusionView:
+    """Exclude a break's delta from reconciliation.
+
+    `virtual` applies to that break's own run date only — a later run re-raises
+    it. `persistent` applies to every run until revoked and is written to GCS,
+    so it survives a restart.
+    """
+    brk = _require_break(request.break_id)
+    config = get_recon_config()
+    try:
+        entry = _state.exclude(
+            break_id=brk.break_id,
+            scope=request.scope,
+            reason=request.reason,
+            excluded_by=request.actor,
+            run_date=brk.date,
+            bucket=config.recon_bucket,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _exclusion_view(entry)
+
+
+@router.post("/exclusions/revoke", response_model=ExclusionView)
+async def revoke_exclusion(request: RevokeRequest) -> ExclusionView:
+    """Revoke an exclusion so the break is raised again. Soft-delete."""
+    config = get_recon_config()
+    revoked = _state.revoke_exclusion(
+        break_id=request.break_id,
+        revoked_by=request.actor,
+        reason=request.reason,
+        bucket=config.recon_bucket,
+    )
+    if revoked is None:
+        raise HTTPException(status_code=404, detail=f"No active exclusion for break {request.break_id}")
+    return _exclusion_view(revoked)
+
+
+@router.get("/exclusions", response_model=list[ExclusionView])
+async def list_exclusions(active_only: bool = False) -> list[ExclusionView]:
+    """Every exclusion ever recorded. Defaults to the full audit view."""
+    config = get_recon_config()
+    entries = _state.all_exclusions(config.recon_bucket)
+    if active_only:
+        entries = tuple(e for e in entries if e.is_active)
+    return [_exclusion_view(e) for e in entries]
