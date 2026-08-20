@@ -71,6 +71,14 @@ class ReconConfig(UnifiedCloudConfig):
     # recon-drift events.
     soak_mode: bool = False
 
+    # T+1 batch/live TTL (engine/live_ttl.py) — the two config knobs the plan's
+    # "T+1 batch/live reconciliation + live TTL" tranche calls for. See
+    # engine/live_ttl.LiveTtlConfig for the full contract; these mirror its
+    # defaults so callers building a LiveTtlConfig from service config get the
+    # same sensible, non-blocking defaults (exact-match tolerance, 30-day grace).
+    live_ttl_reconciliation_tolerance: float = 0.0
+    live_ttl_horizon_days: int = 30
+
     def _derive_cross_cutting_buckets(self, cloud: CloudProvider) -> None:
         """Derive recon/events/execution-store buckets (kept out of model_post_init for size).
 
