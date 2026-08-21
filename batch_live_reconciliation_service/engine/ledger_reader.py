@@ -18,6 +18,11 @@ Mapping ``LedgerRow`` (``event_type=trade``) → ``TradeFillRecord``:
   - ``price``         → ``fill_price``
   - ``fees_in_quote`` → ``fees_in_quote``
   - ``timestamp_utc`` → ``tick_timestamp``
+  - ``recon_excluded`` → ``recon_excluded`` (default False; manual-trade second
+    booking path, 2026-08-21 -- this loader carries the flag through unfiltered,
+    every fill is still returned here for audit visibility. The MATCHING stage
+    (``daily_determinism_stage.run_daily_determinism_stage``) is what excludes
+    ``recon_excluded=True`` fills from ``reconcile_day()``'s input sets.)
 
 The ledger is read as newline-delimited JSON (the same transport the existing
 recon stages use for GCS event archives) — no parquet engine dependency.
@@ -140,6 +145,7 @@ def _row_to_fill(row: dict[str, object]) -> TradeFillRecord:
         fill_model=fill_model,
         correlation_id=correlation_id_raw if isinstance(correlation_id_raw, str) else None,
         client_order_id=client_order_id_raw if isinstance(client_order_id_raw, str) else None,
+        recon_excluded=bool(row.get("recon_excluded", False)),
     )
 
 
