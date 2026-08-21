@@ -26,6 +26,7 @@ from unified_api_contracts.internal import (
     ReconVerdictType,
     RunManifest,
     TradeDeviation,
+    TradeFillRecord,
 )
 from unified_api_contracts.internal.reconciliation import ReconciliationDimension
 from unified_api_contracts.internal.risk import PnLFactor
@@ -37,6 +38,23 @@ from batch_live_reconciliation_service.models.recon_report import DeviationRecor
 logger = logging.getLogger(__name__)
 
 _BPS = Decimal(10000)
+
+
+def _exclude_recon_excluded(records: list[TradeFillRecord], *, run_id: str) -> list[TradeFillRecord]:
+    """Drop manual-trade second-booking-path fills (recon_excluded=True) before matching.
+
+    2026-08-21 (plans/active/walkthrough_feedback_remediation_2026_08_21.md):
+    these fills are persisted + audited normally (ledger_reader.py loads them
+    unfiltered) but are excluded HERE, at the matching stage, so they never
+    produce a false determinism/execution deviation against a counterpart run
+    that may never see them (exchange-outage / OTC / not-yet-cleared trades
+    have no guaranteed matching leg in the other run by construction).
+    """
+    kept = [r for r in records if not r.recon_excluded]
+    skipped = len(records) - len(kept)
+    if skipped:
+        logger.info("[daily-determinism] run=%s skipped %d recon_excluded fill(s) from matching", run_id, skipped)
+    return kept
 
 
 def _venue_of(key: str) -> str:
@@ -164,8 +182,12 @@ def run_daily_determinism_stage(
         day_end.isoformat(),
     )
 
-    records_a = load_instruction_ledger_fills(paper_manifest.ledger_root)
-    records_b = load_instruction_ledger_fills(batch_manifest.ledger_root)
+    records_a = _exclude_recon_excluded(
+        load_instruction_ledger_fills(paper_manifest.ledger_root), run_id=paper_manifest.run_id
+    )
+    records_b = _exclude_recon_excluded(
+        load_instruction_ledger_fills(batch_manifest.ledger_root), run_id=batch_manifest.run_id
+    )
 
     report = reconcile_day(
         paper_manifest.run_id,

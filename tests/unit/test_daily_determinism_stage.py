@@ -37,7 +37,9 @@ _TICK = datetime(2026, 6, 19, 12, 0, 0, tzinfo=UTC)
 _CHANNEL = "#uts-live-alerts"
 
 
-def _fill(trade_key: str, *, fill_price: str = "100.0", fees: str = "0.10") -> TradeFillRecord:
+def _fill(
+    trade_key: str, *, fill_price: str = "100.0", fees: str = "0.10", recon_excluded: bool = False
+) -> TradeFillRecord:
     return TradeFillRecord(
         trade_key=trade_key,
         instrument_key="binance:perp:BTC-USDT",
@@ -49,6 +51,7 @@ def _fill(trade_key: str, *, fill_price: str = "100.0", fees: str = "0.10") -> T
         fill_price=Decimal(fill_price),
         fees_in_quote=Decimal(fees),
         fill_model=FillModel.BENCHMARK,
+        recon_excluded=recon_excluded,
     )
 
 
@@ -111,6 +114,22 @@ def test_fill_price_drift_is_fill_model_drift_bug() -> None:
     # A SLIPPAGE PnLFactor rollup is produced (fill-price divergence axis).
     factor_records = [r for r in rollup if r.metric_name.startswith("determinism_factor_")]
     assert any("slippage" in r.metric_name for r in factor_records)
+
+
+def test_recon_excluded_fill_skipped_from_matching() -> None:
+    """A manual-trade second-booking-path fill (recon_excluded=True) is excluded
+    from reconcile_day()'s matching -- present in the paper ledger only (no batch
+    counterpart, as an exchange-outage/OTC/not-yet-cleared fill genuinely has none)
+    must NOT surface as an unmatched-fill deviation."""
+    paper = [_fill("t1"), _fill("manual-otc-1", recon_excluded=True)]
+    batch = [_fill("t1")]  # no counterpart for the recon_excluded fill -- by design
+    report, rollup = _run_stage(paper, batch)
+
+    assert report.is_deterministic is True
+    assert report.determinism_bug_class == DeterminismBugClass.NONE
+    assert report.matched == 1
+    assert report.unmatched_a == 0
+    assert rollup == []
 
 
 def test_alert_event_info_on_epsilon_zero() -> None:
